@@ -1,0 +1,35 @@
+Login
+
+Chicks 
+       in date calander type from today 
+       date and only before days no after days and days .
+        Total amount of chickes. Batch number 
+
+Feed 
+  Feed in
+    Total bags in ,kg,type,date
+   Feed out
+     Total kgs taking out,date,type
+
+Medical 
+    Date , quantity, doze
+
+Daily monitoring 
+    Batch number top
+    Date,age(0 starting maximum 55),
+     mortality, feed intake,bags,kg,avg weight 
+
+Sales
+     Date, vechile no (not required),
+     no of cage, birds, weight 
+
+Current report
+  Displaying mortality(day wise, cumulative, percent),
+remaining chicks,feed intake per bird (per day, cumulative) ,
+feed intake total(from this only feed intake per bird should be calculated),
+added from above input feed(feed remaining),and medicine details 
+
+Final farm closing report 
+    Minimum 40 days input required in daily monitoring,
+     total chicks in,total feeds, mortality, mortality percent,
+     total birds sales , weight,avg weight, short, excess,..... Not need now
