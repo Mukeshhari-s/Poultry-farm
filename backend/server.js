@@ -14,8 +14,7 @@ app.get('/', (req,res) => res.send('Poultry backend running'));
 app.get('/api/health', (req,res) => res.json({ ok: true, time: new Date() }));
 
 // Register routes BEFORE listening
-const flocksRoute = require('./routes/flocks');
-app.use('/api/flocks', flocksRoute);
+app.use('/api/flocks', require('./routes/flocks'));
 
 const feedRoute = require('./routes/feed');
 app.use('/api/feed', feedRoute);
@@ -23,3 +22,10 @@ app.use('/api/feed', feedRoute);
 // Now start the server
 app.listen(PORT, () => console.log(`Server started on ${PORT}`));
 app.use("/api/medicine", require("./routes/medicine"));
+
+app.use('/api/daily', require('./routes/dailyMonitoring'));
+
+app.use('/api/sales', require('./routes/sales'));
+
+const finalReport = require('./reports/final_farm_closing_report');
+app.use(finalReport);

@@ -1,13 +1,13 @@
 const mongoose = require('mongoose');
 
 const FlockSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  batchNumber: { type: String, required: true },
-  breed: String,
-  startDate: { type: Date, default: Date.now },
-  totalChicks: { type: Number, default: 0 },
-  status: { type: String, enum: ['active','sold','culled'], default: 'active' },
-  createdAt: { type: Date, default: Date.now }
+  batch_no: { type: String, unique: true, index: true },
+  start_date: { type: Date, required: true },
+  totalChicks: { type: Number, required: true },
+  status: { type: String, enum: ['active','closed'], default: 'active' },
+  remarks: { type: String },
+}, {
+  timestamps: true
 });
 
 module.exports = mongoose.model('Flock', FlockSchema);
