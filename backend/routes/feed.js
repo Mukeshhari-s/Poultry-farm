@@ -1,11 +1,6 @@
-// routes/feed.js
-console.log('*** LOADING routes/feed.js ***');
-
 const express = require('express');
 const router = express.Router();
-const Feed = require('../models/Feed'); // make sure this matches models/Feed.js
-
-console.log('Feed model loaded:', !!Feed && Feed.modelName ? Feed.modelName : typeof Feed);
+const Feed = require('../models/Feed'); // make sure this matches models/Feed.jsconsole.log('Feed model loaded:', !!Feed && Feed.modelName ? Feed.modelName : typeof Feed);
 function isFutureDate(d) {
   if (!d) return false;
   const input = new Date(d);

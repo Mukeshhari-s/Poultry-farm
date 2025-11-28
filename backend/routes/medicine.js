@@ -3,41 +3,51 @@ const router = express.Router();
 const Medicine = require("../models/Medicine");
 const Flock = require("../models/Flock");
 
-// GET active batch numbers
+// ✅ GET active batch numbers (MongoDB version)
 router.get("/batches", async (req, res) => {
   try {
-    const batches = await Flock.findAll({
-      where: { status: "active" },
-      attributes: ["batch_no"]
-    });
-    res.json(batches);
+    const batches = await Flock.find(
+      { status: "active" },
+      { batch_no: 1, _id: 0 }
+    );
+
+    res.json(batches);  // [{ batch_no: "B001" }, { batch_no: "B002" }]
   } catch (err) {
-    res.status(500).send(err);
+    console.error("Error fetching batches:", err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-// ADD medicine
+// ✅ ADD medicine (MongoDB version)
 router.post("/", async (req, res) => {
   try {
     const { batch_no, date, medicine_name, quantity, dose } = req.body;
 
-    // Save to DB
-    await Medicine.create({ batch_no, date, medicine_name, quantity, dose });
+    const med = new Medicine({
+      batch_no,
+      date,
+      medicine_name,
+      quantity,
+      dose
+    });
+
+    await med.save();
 
     res.json({ message: "Medicine Added Successfully" });
   } catch (err) {
-    console.log(err);
-    res.status(500).send("Error saving medicine");
+    console.error("Error saving medicine:", err);
+    res.status(500).json({ error: "Error saving medicine" });
   }
 });
 
-// GET all medicine data
+// ✅ GET all medicine data (MongoDB version)
 router.get("/", async (req, res) => {
   try {
-    const data = await Medicine.findAll({ order: [["date", "DESC"]] });
+    const data = await Medicine.find().sort({ date: -1 });
     res.json(data);
   } catch (err) {
-    res.status(500).send(err);
+    console.error("Error fetching medicine:", err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 

@@ -1,32 +1,32 @@
-const { DataTypes } = require("sequelize");
-const sequelize = require("../config/db");
+const mongoose = require('mongoose');
 
-const Medicine = sequelize.define("Medicine", {
-  id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true,
-  },
+const MedicineSchema = new mongoose.Schema({
   batch_no: {
-    type: DataTypes.STRING,
-    allowNull: false,
+    type: String,
+    required: true
   },
+
   date: {
-    type: DataTypes.DATEONLY,
-    allowNull: false,
+    type: Date,           // DATEONLY → Date
+    required: true
   },
+
   medicine_name: {
-    type: DataTypes.STRING,
-    allowNull: false,
+    type: String,
+    required: true
   },
+
   quantity: {
-    type: DataTypes.FLOAT,
-    allowNull: false,
+    type: Number,         // FLOAT → Number
+    required: true
   },
+
   dose: {
-    type: DataTypes.STRING,
-    allowNull: false,
-  },
+    type: String,
+    required: true
+  }
+}, {
+  timestamps: true       // adds createdAt + updatedAt
 });
 
-module.exports = Medicine;
+module.exports = mongoose.model('Medicine', MedicineSchema);
