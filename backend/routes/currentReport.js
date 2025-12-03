@@ -69,9 +69,18 @@ router.get('/', async (req, res) => {
     });
 
     // 4) feed totals (in / out / remaining)
-    const feedRecords = await Feed.find({ batch_no: flock.batch_no }).lean();
-    const totalFeedIn = feedRecords.reduce((s, f) => s + safeNum(f.in_kg || f.qty_kg || f.qty || f.inKg || 0), 0);
-    const totalFeedOut = feedRecords.reduce((s, f) => s + safeNum(f.out_kg || f.out || f.used_kg || 0), 0);
+    const feedQuery = flock._id
+      ? { $or: [{ flockId: flock._id }, { batch_no: flock.batch_no }] }
+      : { batch_no: flock.batch_no };
+    const feedRecords = await Feed.find(feedQuery).lean();
+    const totalFeedIn = feedRecords.reduce(
+      (s, f) => s + safeNum(f.kgIn || f.in_kg || f.qty_kg || f.qty || f.inKg || 0),
+      0
+    );
+    const totalFeedOut = feedRecords.reduce(
+      (s, f) => s + safeNum(f.kgOut || f.out_kg || f.out || f.used_kg || 0),
+      0
+    );
     const feedRemaining = totalFeedIn - totalFeedOut;
 
     // 5) medicine grouped by date

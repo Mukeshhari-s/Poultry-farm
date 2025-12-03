@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function ForgotPassword() {
@@ -18,24 +19,25 @@ export default function ForgotPassword() {
     }
 
     const res = await requestPasswordReset(email);
-
-    if (res.ok) setMessage("Reset link sent to your email.");
-    else setErr("Something went wrong.");
+    if (res.ok) setMessage("If the email exists, a reset link was sent.");
+    else setErr(res.message || "Unable to send reset link");
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
-      <form style={{ width: 400 }} onSubmit={submit}>
-        <h2>Forgot Password</h2>
-
-        <label>Email</label>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} />
-
-        {err && <p style={{ color: "red" }}>{err}</p>}
-        {message && <p style={{ color: "green" }}>{message}</p>}
-
-        <button style={{ marginTop: 12 }}>Send Reset Link</button>
+    <div className="card">
+      <h2>Forgot password</h2>
+      <form onSubmit={submit} className="form-grid">
+        <label>
+          <span>Email</span>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" />
+        </label>
+        <button type="submit">Send reset link</button>
       </form>
+      {err && <div className="error">{err}</div>}
+      {message && <div className="success">{message}</div>}
+      <div className="form-footer">
+        <Link to="/login">Back to login</Link>
+      </div>
     </div>
   );
 }

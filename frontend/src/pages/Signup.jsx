@@ -3,120 +3,92 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function Signup() {
-  const { login } = useAuth(); // (Day 4 we replace with real signup API)
-  const nav = useNavigate();
-
+  const navigate = useNavigate();
+  const { signupUser, loading } = useAuth();
   const [form, setForm] = useState({
     name: "",
     email: "",
     password: "",
-    confirm: "",
+    confirmPassword: "",
   });
+  const [error, setError] = useState("");
 
-  const [errors, setErrors] = useState({});
-  const [serverError, setServerError] = useState("");
+  const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  const validate = () => {
-    const e = {};
-    if (!form.name) e.name = "Name is required";
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!form.name || !form.email || !form.password) {
+      setError("All fields are required.");
+      return;
+    }
+    if (form.password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+    if (form.password !== form.confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
 
-    if (!form.email) e.email = "Email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
-      e.email = "Enter a valid email";
+    const res = await signupUser({
+      name: form.name,
+      email: form.email,
+      password: form.password,
+    });
 
-    if (!form.password) e.password = "Password is required";
-    else if (form.password.length < 6)
-      e.password = "Password must be 6+ chars";
+    if (!res.ok) {
+      setError(res.message || "Signup failed");
+      return;
+    }
 
-    if (form.password !== form.confirm)
-      e.confirm = "Passwords do not match";
-
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const submit = async (ev) => {
-    ev.preventDefault();
-    setServerError("");
-
-    if (!validate()) return;
-
-    // For now, simulate signup by auto-login
-    await login({ email: form.email, password: form.password });
-    nav("/dashboard");
+    navigate("/dashboard");
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
-      <form style={card} onSubmit={submit}>
-        <h2>Create an account</h2>
-
-        {/* Name */}
-        <label>Name</label>
-        <input
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-        />
-        {errors.name && <p style={err}>{errors.name}</p>}
-
-        {/* Email */}
-        <label>Email</label>
-        <input
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
-        />
-        {errors.email && <p style={err}>{errors.email}</p>}
-
-        {/* Password */}
-        <label>Password</label>
-        <input
-          type="password"
-          value={form.password}
-          onChange={(e) => setForm({ ...form, password: e.target.value })}
-        />
-        {errors.password && <p style={err}>{errors.password}</p>}
-
-        {/* Confirm */}
-        <label>Confirm Password</label>
-        <input
-          type="password"
-          value={form.confirm}
-          onChange={(e) => setForm({ ...form, confirm: e.target.value })}
-        />
-        {errors.confirm && <p style={err}>{errors.confirm}</p>}
-
-        {serverError && <p style={err}>{serverError}</p>}
-
-        <button style={btn} type="submit">
-          Create Account
+    <div className="card">
+      <h2>Create Account</h2>
+      {error && <div className="error">{error}</div>}
+      <form onSubmit={onSubmit} className="form-grid">
+        <label>
+          <span>Full name</span>
+          <input name="name" value={form.name} onChange={onChange} />
+        </label>
+        <label>
+          <span>Email</span>
+          <input name="email" type="email" value={form.email} onChange={onChange} />
+        </label>
+        <label>
+          <span>Password</span>
+          <input
+            name="password"
+            type="password"
+            minLength={6}
+            value={form.password}
+            onChange={onChange}
+            required
+          />
+        </label>
+        <label>
+          <span>Confirm password</span>
+          <input
+            name="confirmPassword"
+            type="password"
+            minLength={6}
+            value={form.confirmPassword}
+            onChange={onChange}
+            required
+          />
+        </label>
+        <button type="submit" disabled={loading}>
+          {loading ? "Creating..." : "Sign up"}
         </button>
-
-        <p>
-          Already have an account?{" "}
-          <Link to="/login">Login</Link>
-        </p>
       </form>
+      <div className="form-footer">
+        <span>
+          Already registered? <Link to="/login">Login</Link>
+        </span>
+      </div>
     </div>
   );
 }
-
-const card = {
-  width: 420,
-  padding: 20,
-  borderRadius: 8,
-  boxShadow: "0 6px 18px rgba(0,0,0,0.1)",
-  background: "#fff",
-};
-
-const btn = {
-  width: "100%",
-  padding: "10px 12px",
-  marginTop: 14,
-  background: "#111827",
-  color: "#fff",
-  border: 0,
-  borderRadius: 6,
-  cursor: "pointer",
-};
-
-const err = { color: "red", fontSize: 13, marginTop: 4 };

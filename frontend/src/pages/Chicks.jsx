@@ -1,78 +1,164 @@
-// src/pages/Chicks.jsx
-import React, { useEffect, useState } from 'react';
-import { readLS, writeLS } from '../utils/storage';
+import React, { useEffect, useMemo, useState } from "react";
+import { flockApi } from "../services/api";
+import { decorateFlocksWithLabels } from "../utils/helpers";
 
-const today = new Date().toISOString().slice(0,10);
+const today = new Date().toISOString().slice(0, 10);
 
 export default function Chicks() {
-  const [items, setItems] = useState(() => readLS('chicks', []));
-  const [form, setForm] = useState({ id: '', batchNo: '', total: '', date: today });
-  const [error, setError] = useState('');
+  const [flocks, setFlocks] = useState([]);
+  const [form, setForm] = useState({ start_date: today, totalChicks: "", remarks: "" });
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  useEffect(()=> writeLS('chicks', items), [items]);
+  const batchesCount = useMemo(() => flocks.length, [flocks]);
 
-  function validate({batchNo, total, date}) {
-    if (!batchNo?.trim()) return 'Batch no required';
-    if (!total || Number(total) <= 0) return 'Total must be > 0';
-    if (!date) return 'Date required';
-    if (new Date(date) > new Date()) return 'Date cannot be future';
-    return null;
-  }
-
-  function onSubmit(e) {
-    e.preventDefault();
-    const v = validate(form);
-    if (v) { setError(v); return; }
-    setError('');
-    if (form.id) {
-      setItems(prev => prev.map(it => it.id === form.id ? {...it, batchNo: form.batchNo, total: Number(form.total), date: form.date} : it));
-    } else {
-      setItems(prev => [{ id: Date.now().toString(), batchNo: form.batchNo, total: Number(form.total), date: form.date }, ...prev]);
+  const fetchFlocks = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await flockApi.list();
+      const decorated = decorateFlocksWithLabels(data);
+      setFlocks(decorated);
+      return decorated;
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || "Unable to load flocks");
+      return [];
+    } finally {
+      setLoading(false);
     }
-    setForm({ id:'', batchNo:'', total:'', date: today });
-  }
+  };
 
-  function onEdit(id) {
-    const it = items.find(x=>x.id===id);
-    if (it) setForm({ id: it.id, batchNo: it.batchNo, total: it.total.toString(), date: it.date });
-  }
-  function onDelete(id) {
-    if (!confirm('Delete this entry?')) return;
-    setItems(prev => prev.filter(x=>x.id !== id));
-  }
+  useEffect(() => {
+    fetchFlocks();
+  }, []);
+
+  const onChange = (e) => {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!form.start_date || new Date(form.start_date) > new Date()) {
+      setError("Date must be today or earlier.");
+      return;
+    }
+    if (!form.totalChicks || Number(form.totalChicks) <= 0) {
+      setError("Total chicks must be greater than zero.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        start_date: form.start_date,
+        totalChicks: Number(form.totalChicks),
+        remarks: form.remarks || undefined,
+      };
+      await flockApi.create(payload);
+      const updated = await fetchFlocks();
+      const latestLabel = updated[0]?.displayLabel || "New batch";
+      setSuccess(`${latestLabel} created.`);
+      setForm({ start_date: today, totalChicks: "", remarks: "" });
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || "Unable to save batch");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
-    <div style={{maxWidth:900, margin:'24px auto', padding:16}}>
-      <h2>Chicks</h2>
-      <form onSubmit={onSubmit} style={{display:'grid', gap:8, marginBottom:12}}>
-        <input placeholder="Batch No" value={form.batchNo} onChange={e=>setForm({...form, batchNo: e.target.value})} />
-        <input placeholder="Total chicks" type="number" value={form.total} onChange={e=>setForm({...form, total: e.target.value})} />
-        <input type="date" max={today} value={form.date} onChange={e=>setForm({...form, date: e.target.value})} />
+    <div className="page">
+      <div className="page-header">
         <div>
-          <button type="submit">{form.id ? 'Update' : 'Add'}</button>
-          <button type="button" onClick={()=> setForm({id:'', batchNo:'', total:'', date: today})} style={{marginLeft:8}}>Reset</button>
+          <h1>Chicks / Batches</h1>
+          <p>Track flock intake by date. {batchesCount} batch(es) recorded.</p>
         </div>
-        {error && <div style={{color:'red'}}>{error}</div>}
-      </form>
+        <button onClick={fetchFlocks} disabled={loading}>
+          {loading ? "Refreshing..." : "Refresh"}
+        </button>
+      </div>
 
-      <table border="1" cellPadding="6" style={{width:'100%', borderCollapse:'collapse'}}>
-        <thead><tr><th>Batch</th><th>Total</th><th>Date</th><th>Actions</th></tr></thead>
-        <tbody>
-          {items.length === 0 ? <tr><td colSpan="4">No entries</td></tr> :
-            items.map(it => (
-              <tr key={it.id}>
-                <td>{it.batchNo}</td>
-                <td>{it.total}</td>
-                <td>{it.date}</td>
-                <td>
-                  <button onClick={()=>onEdit(it.id)}>Edit</button>
-                  <button onClick={()=>onDelete(it.id)} style={{marginLeft:8}}>Delete</button>
-                </td>
+      <div className="card">
+        <h2>Add new batch</h2>
+        <form className="grid-2" onSubmit={onSubmit}>
+          <label>
+            <span>Start date</span>
+            <input
+              type="date"
+              name="start_date"
+              max={today}
+              value={form.start_date}
+              onChange={onChange}
+            />
+          </label>
+          <label>
+            <span>Total chicks</span>
+            <input
+              type="number"
+              name="totalChicks"
+              min="1"
+              value={form.totalChicks}
+              onChange={onChange}
+            />
+          </label>
+          <label className="grid-full">
+            <span>Remarks (optional)</span>
+            <textarea
+              name="remarks"
+              rows={3}
+              value={form.remarks}
+              onChange={onChange}
+            />
+          </label>
+          <div className="grid-full">
+            <button type="submit" disabled={submitting}>
+              {submitting ? "Saving..." : "Create batch"}
+            </button>
+          </div>
+        </form>
+        {error && <div className="error mt">{error}</div>}
+        {success && <div className="success mt">{success}</div>}
+      </div>
+
+      <div className="card">
+        <h2>Existing batches</h2>
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Batch no</th>
+                <th>Start date</th>
+                <th>Total chicks</th>
+                <th>Status</th>
+                <th>Remarks</th>
               </tr>
-            ))
-          }
-        </tbody>
-      </table>
+            </thead>
+            <tbody>
+              {flocks.length === 0 && (
+                <tr>
+                  <td colSpan="5" style={{ textAlign: "center" }}>
+                    {loading ? "Loading..." : "No batches yet"}
+                  </td>
+                </tr>
+              )}
+              {flocks.map((flock) => (
+                <tr key={flock._id}>
+                  <td>{flock.displayLabel || flock.batch_no || "-"}</td>
+                  <td>{flock.start_date ? flock.start_date.slice(0, 10) : "-"}</td>
+                  <td>{flock.totalChicks}</td>
+                  <td>{flock.status}</td>
+                  <td>{flock.remarks || "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

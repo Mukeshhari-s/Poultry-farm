@@ -43,6 +43,10 @@ router.post('/register', authLimiter, async (req, res) => {
 
   } catch (err) {
     console.error('Register error:', err);
+    if (err.name === 'ValidationError') {
+      const message = Object.values(err.errors).map((e) => e.message).join(', ');
+      return res.status(400).json({ error: message || 'Invalid data supplied' });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 });

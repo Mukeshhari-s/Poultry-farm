@@ -1,31 +1,53 @@
 import React from "react";
-import { Outlet, Link } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+
+const links = [
+  { to: "/dashboard", label: "Dashboard" },
+  { to: "/chicks", label: "Chicks" },
+  { to: "/feed", label: "Feed" },
+  { to: "/medical", label: "Medical" },
+  { to: "/daily-monitoring", label: "Daily" },
+  { to: "/sales", label: "Sales" },
+  { to: "/current-report", label: "Current" },
+  { to: "/final-report", label: "Final" },
+];
 
 export default function MainLayout() {
   const { user, logout } = useAuth();
 
   return (
-    <div>
-      <header style={{ padding: 12, borderBottom: "1px solid #eee" }}>
-        <nav style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <Link to="/dashboard">Dashboard</Link>
-          <div style={{ marginLeft: "auto" }}>
-            {user ? (
-              <>
-                <span style={{ marginRight: 8 }}>{user.name}</span>
-                <button onClick={logout}>Logout</button>
-              </>
-            ) : (
-              <Link to="/login">Login</Link>
-            )}
-          </div>
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="brand">Poultry Manager</div>
+        <nav>
+          {links.map((link) => (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              className={({ isActive }) =>
+                isActive ? "nav-link active" : "nav-link"
+              }
+            >
+              {link.label}
+            </NavLink>
+          ))}
         </nav>
-      </header>
-
-      <main style={{ padding: 16 }}>
-        <Outlet />
-      </main>
+      </aside>
+      <div className="content-area">
+        <header className="topbar">
+          <div className="spacer" />
+          <div>
+            <span className="user-name">{user?.name}</span>
+            <button onClick={logout} className="ghost">
+              Logout
+            </button>
+          </div>
+        </header>
+        <main>
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

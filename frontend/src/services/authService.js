@@ -1,16 +1,8 @@
-import axios from "axios";
+import { authApi } from "./api";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const login = (payload) => authApi.login(payload);
+const signup = (payload) => authApi.register(payload);
+const forgotPassword = (email) => authApi.forgot({ email });
+const resetPassword = (token, password) => authApi.reset(token, { password });
 
-async function login(payload){
-  const { data } = await axios.post(`${API_BASE}/auth/login`, payload);
-  // adapt depending on your backend response shape
-  return data;
-}
-
-async function signup(payload){
-  const { data } = await axios.post(`${API_BASE}/auth/signup`, payload);
-  return data;
-}
-
-export default { login, signup };
+export default { login, signup, forgotPassword, resetPassword };

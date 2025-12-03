@@ -4,38 +4,45 @@ import { useAuth } from "../context/AuthContext";
 
 export default function ResetPassword() {
   const { token } = useParams();
+  const navigate = useNavigate();
   const { resetPassword } = useAuth();
-  const [pass, setPass] = useState("");
-  const [msg, setMsg] = useState("");
-  const nav = useNavigate();
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
   const submit = async (e) => {
     e.preventDefault();
-    const res = await resetPassword(token, pass);
+    setError("");
+    if (!password) {
+      setError("Password required");
+      return;
+    }
+
+    const res = await resetPassword(token, password);
     if (res.ok) {
-      setMsg("Password reset successful!");
-      setTimeout(() => nav("/login"), 1500);
+      setMessage("Password updated. Redirecting to login...");
+      setTimeout(() => navigate("/login"), 1500);
     } else {
-      setMsg("Reset failed.");
+      setError(res.message || "Reset failed");
     }
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}>
-      <form style={{ width: 400 }} onSubmit={submit}>
-        <h2>Reset Password</h2>
-
-        <label>New Password</label>
-        <input
-          type="password"
-          value={pass}
-          onChange={(e) => setPass(e.target.value)}
-        />
-
-        <button style={{ marginTop: 12 }}>Reset Password</button>
-
-        {msg && <p>{msg}</p>}
+    <div className="card">
+      <h2>Set a new password</h2>
+      <form onSubmit={submit} className="form-grid">
+        <label>
+          <span>New password</span>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </label>
+        <button type="submit">Reset password</button>
       </form>
+      {error && <div className="error">{error}</div>}
+      {message && <div className="success">{message}</div>}
     </div>
   );
 }
