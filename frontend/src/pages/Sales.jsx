@@ -4,6 +4,15 @@ import { salesApi } from "../services/api";
 
 const today = new Date().toISOString().slice(0, 10);
 
+const emptySaleForm = () => ({
+	date: today,
+	vehicle_no: "",
+	cages: "",
+	birds: "",
+	total_weight: "",
+	remarks: "",
+});
+
 export default function Sales() {
 	const { flocks } = useFlocks();
 	const [selectedBatch, setSelectedBatch] = useState("");
@@ -12,14 +21,11 @@ export default function Sales() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
 	const [success, setSuccess] = useState("");
-	const [form, setForm] = useState({
-		date: today,
-		vehicle_no: "",
-		cages: "",
-		birds: "",
-		total_weight: "",
-		remarks: "",
-	});
+	const [saving, setSaving] = useState(false);
+	const [form, setForm] = useState(emptySaleForm);
+	const [editingSale, setEditingSale] = useState(null);
+	const [editForm, setEditForm] = useState(emptySaleForm);
+	const [savingEdit, setSavingEdit] = useState(false);
 
 	const fetchSales = async (batch_no) => {
 		if (!batch_no) return;
@@ -47,6 +53,11 @@ export default function Sales() {
 		if (selectedBatch) fetchSales(selectedBatch);
 	}, [selectedBatch]);
 
+	useEffect(() => {
+		setEditingSale(null);
+		setEditForm(emptySaleForm());
+	}, [selectedBatch]);
+
 	const onChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
 	const onSubmit = async (e) => {
@@ -57,6 +68,7 @@ export default function Sales() {
 			setError("Select a batch first");
 			return;
 		}
+		setSaving(true);
 		try {
 			await salesApi.create({
 				batch_no: selectedBatch,
@@ -68,10 +80,61 @@ export default function Sales() {
 				remarks: form.remarks,
 			});
 			setSuccess("Sale recorded.");
-			setForm({ date: today, vehicle_no: "", cages: "", birds: "", total_weight: "", remarks: "" });
+			setForm(emptySaleForm());
 			fetchSales(selectedBatch);
 		} catch (err) {
 			setError(err.response?.data?.error || err.message || "Unable to save sale");
+		} finally {
+			setSaving(false);
+		}
+	};
+
+	const onEditChange = (e) => setEditForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+
+	const startEdit = (sale) => {
+		setEditingSale(sale);
+		setEditForm({
+			date: sale.date?.slice(0, 10) || today,
+			vehicle_no: sale.vehicle_no || "",
+			cages: sale.cages?.toString() || "0",
+			birds: sale.birds?.toString() || "0",
+			total_weight: sale.total_weight?.toString() || "0",
+			remarks: sale.remarks || "",
+		});
+		setError("");
+		setSuccess("");
+	};
+
+	const cancelEdit = () => {
+		setEditingSale(null);
+		setEditForm(emptySaleForm());
+	};
+
+	const parseNumber = (value) => Number(value || 0);
+
+	const onEditSubmit = async (e) => {
+		e.preventDefault();
+		if (!editingSale) return;
+		setSavingEdit(true);
+		setError("");
+		setSuccess("");
+		try {
+			await salesApi.update(editingSale._id, {
+				date: editForm.date,
+				vehicle_no: editForm.vehicle_no,
+				cages: parseNumber(editForm.cages),
+				birds: parseNumber(editForm.birds),
+				total_weight: parseNumber(editForm.total_weight),
+				remarks: editForm.remarks,
+			});
+			setSuccess("Sale entry updated.");
+			const batchNo = selectedBatch || editingSale.batch_no;
+			cancelEdit();
+			fetchSales(batchNo);
+		} catch (err) {
+			setError(err.response?.data?.error || err.message || "Unable to update sale");
+		} finally {
+			setSavingEdit(false);
 		}
 	};
 
@@ -151,10 +214,55 @@ export default function Sales() {
 						<textarea name="remarks" rows={2} value={form.remarks} onChange={onChange} />
 					</label>
 					<div className="grid-full">
-						<button type="submit">Save sale</button>
+						<button type="submit" disabled={saving}>
+							{saving ? "Saving..." : "Save sale"}
+						</button>
 					</div>
 				</form>
 			</div>
+
+			{editingSale && (
+				<div className="card mt">
+					<div className="card-header">
+						<h2>Edit sale record</h2>
+						<div className="stat-pill">{editingSale.date?.slice(0, 10) || "--"}</div>
+					</div>
+					<form className="grid-3" onSubmit={onEditSubmit}>
+						<label>
+							<span>Date</span>
+							<input type="date" name="date" max={today} value={editForm.date} onChange={onEditChange} />
+						</label>
+						<label>
+							<span>Vehicle no.</span>
+							<input name="vehicle_no" value={editForm.vehicle_no} onChange={onEditChange} />
+						</label>
+						<label>
+							<span>Cages</span>
+							<input type="number" min="0" name="cages" value={editForm.cages} onChange={onEditChange} />
+						</label>
+						<label>
+							<span>Birds</span>
+							<input type="number" min="0" name="birds" value={editForm.birds} onChange={onEditChange} />
+						</label>
+						<label>
+							<span>Total weight (kg)</span>
+							<input type="number" min="0" step="0.01" name="total_weight" value={editForm.total_weight} onChange={onEditChange} />
+						</label>
+						<label className="grid-full">
+							<span>Remarks</span>
+							<textarea name="remarks" rows={2} value={editForm.remarks} onChange={onEditChange} />
+						</label>
+						<div className="grid-full" style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+							<button type="submit" disabled={savingEdit}>
+								{savingEdit ? "Saving..." : "Update sale"}
+							</button>
+							<button type="button" className="ghost" onClick={cancelEdit}>
+								Cancel
+							</button>
+						</div>
+					</form>
+				</div>
+			)}
 
 			<div className="card mt">
 				<h2>Sales log</h2>
@@ -168,12 +276,13 @@ export default function Sales() {
 								<th>Birds</th>
 								<th>Weight (kg)</th>
 								<th>Remarks</th>
+								<th>Actions</th>
 							</tr>
 						</thead>
 						<tbody>
 							{records.length === 0 && (
 								<tr>
-									<td colSpan="6" style={{ textAlign: "center" }}>
+									<td colSpan="7" style={{ textAlign: "center" }}>
 										{loading ? "Loading..." : "No sale entries"}
 									</td>
 								</tr>
@@ -186,6 +295,11 @@ export default function Sales() {
 									<td>{sale.birds}</td>
 									<td>{sale.total_weight}</td>
 									<td>{sale.remarks || "-"}</td>
+									<td>
+										<button type="button" className="link" onClick={() => startEdit(sale)}>
+											Edit
+										</button>
+									</td>
 								</tr>
 							))}
 						</tbody>

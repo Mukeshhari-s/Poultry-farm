@@ -27,22 +27,27 @@ export const authApi = {
 export const flockApi = {
 	list: () => unwrap(api.get("/flocks")),
 	create: (payload) => unwrap(api.post("/flocks", payload)),
+	update: (id, payload) => unwrap(api.patch(`/flocks/${id}`, payload)),
+	close: (id, payload = {}) => unwrap(api.patch(`/flocks/${id}/close`, payload)),
 };
 
 export const feedApi = {
 	list: (params = {}) => unwrap(api.get("/feed", { params })),
 	addIn: (payload) => unwrap(api.post("/feed/in", payload)),
 	addOut: (payload) => unwrap(api.post("/feed/out", payload)),
+	update: (id, payload) => unwrap(api.patch(`/feed/${id}`, payload)),
 };
 
 export const medicineApi = {
 	list: () => unwrap(api.get("/medicine")),
 	batches: () => unwrap(api.get("/medicine/batches")),
 	create: (payload) => unwrap(api.post("/medicine", payload)),
+	update: (id, payload) => unwrap(api.patch(`/medicine/${id}`, payload)),
 };
 
 export const monitoringApi = {
 	create: (payload) => unwrap(api.post("/daily", payload)),
+	update: (id, payload) => unwrap(api.patch(`/daily/${id}`, payload)),
 	list: (params = {}) => unwrap(api.get("/daily", { params })),
 };
 
@@ -50,6 +55,7 @@ export const salesApi = {
 	list: (params = {}) => unwrap(api.get("/sale", { params })),
 	create: (payload) => unwrap(api.post("/sale", payload)),
 	remaining: (batchNo) => unwrap(api.get(`/sale/remaining/${batchNo}`)),
+	update: (id, payload) => unwrap(api.patch(`/sale/${id}`, payload)),
 };
 
 export const reportApi = {

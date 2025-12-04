@@ -47,12 +47,14 @@ router.get('/', async (req, res) => {
 
       const birdsAtStart = Math.max(0, totalChicks - prevCumulative);
       const feedKg = safeNum(d.feedKg || d.feed_kg || d.feed_intake_kg || d.feedKgToday || d.feedKgToday || d.feedKg || d.feed || 0);
+      const feedBags = safeNum(d.feedBags || d.feed_bags || d.bags || 0);
 
       const feedPerBird = birdsAtStart > 0 ? feedKg / birdsAtStart : 0;
       cumulativeFeedKg += feedKg;
       const cumulativeFeedPerBird = birdsAtStart > 0 ? (cumulativeFeedKg / Math.max(1, totalChicks - 0)) : 0; // cumulative per original chicks
 
       return {
+        _id: d._id,
         date: d.date ? d.date.toISOString().slice(0,10) : null,
         age: d.age ?? null,
         mortality: mort,
@@ -60,6 +62,7 @@ router.get('/', async (req, res) => {
         mortalityPercent: totalChicks > 0 ? Number(((cumulativeMort / totalChicks) * 100).toFixed(2)) : 0,
         birdsAtStart,
         feedKg: Number(feedKg.toFixed ? feedKg.toFixed(3) : feedKg),
+        feedBags,
         feedPerBird: Number(feedPerBird.toFixed(4)),
         cumulativeFeedKg: Number(cumulativeFeedKg.toFixed(3)),
         cumulativeFeedPerBird: Number(cumulativeFeedPerBird.toFixed(4)),

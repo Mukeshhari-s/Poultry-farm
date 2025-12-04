@@ -103,4 +103,59 @@ router.get('/remaining/:batch_no', async (req, res) => {
   }
 });
 
+// Update sale entry
+router.patch('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { date, vehicle_no, cages, birds, total_weight, remarks } = req.body || {};
+
+    const sale = await Sale.findById(id);
+    if (!sale) return res.status(404).json({ error: 'Sale entry not found' });
+
+    if (date !== undefined) {
+      if (!date) return res.status(400).json({ error: 'date is required' });
+      const parsed = strip(date);
+      const today = strip(new Date());
+      if (parsed > today) return res.status(400).json({ error: 'date cannot be in the future' });
+      const batch = await Flock.findOne({ batch_no: sale.batch_no });
+      if (!batch) return res.status(400).json({ error: 'batch_no not found' });
+      if (parsed < strip(batch.start_date)) return res.status(400).json({ error: 'sale date cannot be before batch start_date' });
+      sale.date = parsed;
+    }
+
+    if (vehicle_no !== undefined) sale.vehicle_no = vehicle_no;
+    if (remarks !== undefined) sale.remarks = remarks;
+
+    if (cages !== undefined) {
+      const value = Number(cages);
+      if (!Number.isFinite(value) || value < 0) return res.status(400).json({ error: 'cages must be >= 0' });
+      sale.cages = value;
+    }
+
+    if (total_weight !== undefined) {
+      const value = Number(total_weight);
+      if (!Number.isFinite(value) || value <= 0) return res.status(400).json({ error: 'total_weight must be > 0' });
+      sale.total_weight = value;
+    }
+
+    if (birds !== undefined) {
+      const value = Number(birds);
+      if (!Number.isFinite(value) || value <= 0) return res.status(400).json({ error: 'birds must be > 0' });
+      const { remaining } = await getRemainingBirds(sale.batch_no);
+      const available = remaining + sale.birds; // add back previous value
+      if (value > available) {
+        return res.status(400).json({ error: `not enough birds. Remaining: ${available}` });
+      }
+      sale.birds = value;
+    }
+
+    const saved = await sale.save();
+    res.json(saved);
+  } catch (err) {
+    console.error(err);
+    if (err.message === 'batch_not_found') return res.status(400).json({ error: 'batch_no not found' });
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

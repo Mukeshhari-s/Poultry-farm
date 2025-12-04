@@ -19,6 +19,8 @@ export default function Medical() {
 		quantity: "",
 		dose: "",
 	});
+	const [editingRecord, setEditingRecord] = useState(null);
+	const [savingEdit, setSavingEdit] = useState(false);
 
 	const fetchRecords = async () => {
 		setLoading(true);
@@ -47,18 +49,51 @@ export default function Medical() {
 			setError("All fields are required.");
 			return;
 		}
+		setSavingEdit(true);
 
 		try {
-			await medicineApi.create({
-				...form,
-				quantity: Number(form.quantity),
-			});
-			setSuccess("Medicine saved.");
+			if (editingRecord) {
+				await medicineApi.update(editingRecord._id, {
+					batch_no: form.batch_no,
+					date: form.date,
+					medicine_name: form.medicine_name,
+					quantity: Number(form.quantity),
+					dose: form.dose,
+				});
+				setSuccess("Medicine entry updated.");
+				setEditingRecord(null);
+			} else {
+				await medicineApi.create({
+					...form,
+					quantity: Number(form.quantity),
+				});
+				setSuccess("Medicine saved.");
+			}
 			setForm({ batch_no: form.batch_no, date: today, medicine_name: "", quantity: "", dose: "" });
 			fetchRecords();
 		} catch (err) {
 			setError(err.response?.data?.error || err.message || "Unable to save record");
+		} finally {
+			setSavingEdit(false);
 		}
+	};
+
+	const onEditRecord = (rec) => {
+		setEditingRecord(rec);
+		setForm({
+			batch_no: rec.batch_no,
+			date: rec.date?.slice(0, 10) || today,
+			medicine_name: rec.medicine_name,
+			quantity: rec.quantity?.toString() || "",
+			dose: rec.dose || "",
+		});
+		setError("");
+		setSuccess("");
+	};
+
+	const cancelEdit = () => {
+		setEditingRecord(null);
+		setForm({ batch_no: "", date: today, medicine_name: "", quantity: "", dose: "" });
 	};
 
 	return (
@@ -74,7 +109,7 @@ export default function Medical() {
 			{success && <div className="success mb">{success}</div>}
 
 			<div className="card">
-				<h2>Add medicine entry</h2>
+				<h2>{editingRecord ? "Edit medicine entry" : "Add medicine entry"}</h2>
 				<form className="grid-2" onSubmit={onSubmit}>
 					<label>
 						<span>Batch</span>
@@ -110,8 +145,15 @@ export default function Medical() {
 						<span>Dose / instructions</span>
 						<input name="dose" value={form.dose} onChange={onChange} />
 					</label>
-					<div className="grid-full">
-						<button type="submit">Save medicine</button>
+					<div className="grid-full" style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+						<button type="submit" disabled={savingEdit}>
+							{savingEdit ? "Saving..." : editingRecord ? "Update entry" : "Save medicine"}
+						</button>
+						{editingRecord && (
+							<button type="button" className="ghost" onClick={cancelEdit}>
+								Cancel
+							</button>
+						)}
 					</div>
 				</form>
 			</div>
@@ -127,6 +169,7 @@ export default function Medical() {
 								<th>Medicine</th>
 								<th>Quantity</th>
 								<th>Dose</th>
+								<th>Actions</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -144,6 +187,11 @@ export default function Medical() {
 									<td>{rec.medicine_name}</td>
 									<td>{rec.quantity}</td>
 									<td>{rec.dose}</td>
+									<td>
+										<button type="button" className="link" onClick={() => onEditRecord(rec)}>
+											Edit
+										</button>
+									</td>
 								</tr>
 							))}
 						</tbody>

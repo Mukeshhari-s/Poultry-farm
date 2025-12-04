@@ -1,13 +1,17 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import useFlocks from "../hooks/useFlocks";
-import { reportApi } from "../services/api";
+import { flockApi, reportApi } from "../services/api";
 
 export default function FinalReport() {
-	const { flocks } = useFlocks();
+	const { flocks, refreshFlocks } = useFlocks();
 	const [selectedFlockId, setSelectedFlockId] = useState("");
 	const [data, setData] = useState(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
+	const [closeRemarks, setCloseRemarks] = useState("");
+	const [closing, setClosing] = useState(false);
+	const [closeMessage, setCloseMessage] = useState("");
+	const [closeError, setCloseError] = useState("");
 
 	const loadReport = async (flockId) => {
 		if (!flockId) return;
@@ -33,6 +37,33 @@ export default function FinalReport() {
 		if (selectedFlockId) loadReport(selectedFlockId);
 	}, [selectedFlockId]);
 
+	useEffect(() => {
+		setCloseRemarks("");
+		setCloseError("");
+		setCloseMessage("");
+	}, [selectedFlockId]);
+
+	const selectedFlock = useMemo(() => flocks.find((f) => f._id === selectedFlockId), [flocks, selectedFlockId]);
+	const isClosed = selectedFlock?.status === "closed";
+
+	const handleClose = async (e) => {
+		e.preventDefault();
+		if (!selectedFlockId) return;
+		setClosing(true);
+		setCloseError("");
+		setCloseMessage("");
+		try {
+			await flockApi.close(selectedFlockId, closeRemarks ? { remarks: closeRemarks } : undefined);
+			setCloseRemarks("");
+			setCloseMessage("Batch closed successfully.");
+			await refreshFlocks();
+		} catch (err) {
+			setCloseError(err.response?.data?.error || err.message || "Unable to close batch");
+		} finally {
+			setClosing(false);
+		}
+	};
+
 	const rows = data?.rows || [];
 	const summaryCards = [
 		{ label: "Total chicks in", value: data?.totalChicks ?? "-" },
@@ -51,15 +82,51 @@ export default function FinalReport() {
 					<h1>Final closing report</h1>
 					<p>Summarize a batch after 40+ days of monitoring.</p>
 				</div>
-				<select value={selectedFlockId} onChange={(e) => setSelectedFlockId(e.target.value)}>
-					<option value="">Select flock</option>
-					{flocks.map((f) => (
-						<option key={f._id} value={f._id}>
-							{f.displayLabel || f.batch_no || f._id}
-						</option>
-					))}
-				</select>
+				<div className="header-actions">
+					<select value={selectedFlockId} onChange={(e) => setSelectedFlockId(e.target.value)}>
+						<option value="">Select flock</option>
+						{flocks.map((f) => (
+							<option key={f._id} value={f._id}>
+								{f.displayLabel || f.batch_no || f._id}
+							</option>
+						))}
+					</select>
+				</div>
 			</div>
+
+			{selectedFlock && (
+				<div className="card mb">
+					<div className="card-header">
+						<h2>Batch status</h2>
+						<div className={`stat-pill ${isClosed ? "success" : "warning"}`}>
+							{isClosed ? "Closed" : "Active"}
+						</div>
+					</div>
+					{isClosed ? (
+						<p className="muted">
+							Closed on {selectedFlock.closedAt ? new Date(selectedFlock.closedAt).toLocaleDateString() : "--"}
+							{selectedFlock.closeRemarks ? ` – ${selectedFlock.closeRemarks}` : ""}
+						</p>
+					) : (
+						<form className="close-form" onSubmit={handleClose}>
+							<label>
+								<span>Closing remarks (optional)</span>
+								<input
+									type="text"
+									value={closeRemarks}
+									onChange={(e) => setCloseRemarks(e.target.value)}
+									placeholder="Notes about this closure"
+								/>
+							</label>
+							<button type="submit" disabled={closing}>
+								{closing ? "Closing..." : "Mark batch as closed"}
+							</button>
+						</form>
+					)}
+					{closeError && <div className="error mt">{closeError}</div>}
+					{closeMessage && <div className="success mt">{closeMessage}</div>}
+				</div>
+			)}
 
 			{error && <div className="error mb">{error}</div>}
 

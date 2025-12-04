@@ -65,4 +65,56 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Update feed entry
+router.patch('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type, date, bagsIn, kgIn, kgOut, flockId } = req.body || {};
+
+    const feed = await Feed.findById(id);
+    if (!feed) return res.status(404).json({ error: 'Feed entry not found' });
+
+    if (type !== undefined) {
+      if (!type) return res.status(400).json({ error: 'type is required' });
+      feed.type = type;
+    }
+
+    if (date !== undefined) {
+      if (!date) return res.status(400).json({ error: 'date is required' });
+      if (isFutureDate(date)) return res.status(400).json({ error: 'date cannot be in the future' });
+      const parsedDate = new Date(date);
+      if (Number.isNaN(parsedDate.getTime())) return res.status(400).json({ error: 'Invalid date' });
+      feed.date = parsedDate;
+    }
+
+    if (bagsIn !== undefined) {
+      const value = Number(bagsIn);
+      if (value < 0) return res.status(400).json({ error: 'bagsIn cannot be negative' });
+      feed.bagsIn = value;
+    }
+
+    if (kgIn !== undefined) {
+      const value = Number(kgIn);
+      if (value < 0) return res.status(400).json({ error: 'kgIn cannot be negative' });
+      feed.kgIn = value;
+    }
+
+    if (kgOut !== undefined) {
+      const value = Number(kgOut);
+      if (value < 0) return res.status(400).json({ error: 'kgOut cannot be negative' });
+      feed.kgOut = value;
+    }
+
+    if (flockId !== undefined) {
+      feed.flockId = flockId;
+    }
+
+    const saved = await feed.save();
+    res.json(saved);
+  } catch (err) {
+    console.error('Error updating feed entry:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

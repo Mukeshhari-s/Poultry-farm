@@ -51,4 +51,36 @@ router.get("/", async (req, res) => {
   }
 });
 
+// ✅ UPDATE medicine entry
+router.patch('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { batch_no, date, medicine_name, quantity, dose } = req.body || {};
+
+    const med = await Medicine.findById(id);
+    if (!med) return res.status(404).json({ error: 'Medicine entry not found' });
+
+    if (batch_no !== undefined) med.batch_no = batch_no;
+    if (date !== undefined) {
+      if (!date) return res.status(400).json({ error: 'date is required' });
+      const parsedDate = new Date(date);
+      if (Number.isNaN(parsedDate.getTime())) return res.status(400).json({ error: 'Invalid date' });
+      med.date = parsedDate;
+    }
+    if (medicine_name !== undefined) med.medicine_name = medicine_name;
+    if (quantity !== undefined) {
+      const qty = Number(quantity);
+      if (!Number.isFinite(qty) || qty < 0) return res.status(400).json({ error: 'quantity must be >= 0' });
+      med.quantity = qty;
+    }
+    if (dose !== undefined) med.dose = dose;
+
+    await med.save();
+    res.json(med);
+  } catch (err) {
+    console.error('Error updating medicine:', err);
+    res.status(500).json({ error: 'Error updating medicine' });
+  }
+});
+
 module.exports = router;

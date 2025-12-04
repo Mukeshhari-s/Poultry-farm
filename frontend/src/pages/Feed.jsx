@@ -33,6 +33,18 @@ export default function Feed() {
 	const [feedOutForm, setFeedOutForm] = useState(defaultOutForm);
 	const [savingIn, setSavingIn] = useState(false);
 	const [savingOut, setSavingOut] = useState(false);
+	const [editingFeed, setEditingFeed] = useState(null);
+	const [editFeedForm, setEditFeedForm] = useState({
+		id: "",
+		entryType: "in",
+		date: today,
+		type: "",
+		bagsIn: "",
+		kgIn: "",
+		kgOut: "",
+		flockId: "",
+	});
+	const [savingEdit, setSavingEdit] = useState(false);
 
 	const fetchFeed = async (flockId = "") => {
 		setLoading(true);
@@ -128,6 +140,59 @@ export default function Feed() {
 		</select>
 	);
 
+	const onEditFeed = (log) => {
+		const entryType = log.kgOut && Number(log.kgOut) > 0 ? "out" : "in";
+		setEditingFeed(log);
+		setEditFeedForm({
+			id: log._id,
+			entryType,
+			date: log.date?.slice(0, 10) || today,
+			type: log.type || "",
+			bagsIn: log.bagsIn?.toString() || "",
+			kgIn: log.kgIn?.toString() || "",
+			kgOut: log.kgOut?.toString() || "",
+			flockId: log.flockId || selectedFlock || "",
+		});
+		setError("");
+		setSuccess("");
+	};
+
+	const cancelFeedEdit = () => {
+		setEditingFeed(null);
+	};
+
+	const onFeedEditSubmit = async (e) => {
+		e.preventDefault();
+		if (!editingFeed) return;
+		setSavingEdit(true);
+		setError("");
+		setSuccess("");
+		try {
+			const payload = {
+				type: editFeedForm.type,
+				date: editFeedForm.date,
+				flockId: editFeedForm.flockId,
+			};
+			if (editFeedForm.entryType === "in") {
+				payload.bagsIn = editFeedForm.bagsIn ? Number(editFeedForm.bagsIn) : 0;
+				payload.kgIn = editFeedForm.kgIn ? Number(editFeedForm.kgIn) : 0;
+				payload.kgOut = 0;
+			} else {
+				payload.kgOut = editFeedForm.kgOut ? Number(editFeedForm.kgOut) : 0;
+				payload.bagsIn = 0;
+				payload.kgIn = 0;
+			}
+			await feedApi.update(editFeedForm.id, payload);
+			setSuccess("Feed entry updated.");
+			setEditingFeed(null);
+			fetchFeed(selectedFlock);
+		} catch (err) {
+			setError(err.response?.data?.error || err.message || "Unable to update feed entry");
+		} finally {
+			setSavingEdit(false);
+		}
+	};
+
 	return (
 		<div className="page">
 			<div className="page-header">
@@ -140,6 +205,84 @@ export default function Feed() {
 
 			{error && <div className="error mb">{error}</div>}
 			{success && <div className="success mb">{success}</div>}
+
+			{editingFeed && (
+				<div className="card">
+					<h2>Edit feed entry</h2>
+					<form className="grid-2" onSubmit={onFeedEditSubmit}>
+						<label>
+							<span>Entry type</span>
+							<input value={editFeedForm.entryType === "in" ? "Feed in" : "Feed out"} disabled />
+						</label>
+						<label>
+							<span>Batch</span>
+							<select value={editFeedForm.flockId} onChange={(e) => setEditFeedForm({ ...editFeedForm, flockId: e.target.value })}>
+								<option value="">Select batch</option>
+								{flocks.map((f) => (
+									<option key={f._id} value={f._id}>
+										{f.displayLabel || f.batch_no || f._id}
+									</option>
+								))}
+							</select>
+						</label>
+						<label>
+							<span>Date</span>
+							<input
+								type="date"
+								max={today}
+								value={editFeedForm.date}
+								onChange={(e) => setEditFeedForm({ ...editFeedForm, date: e.target.value })}
+							/>
+						</label>
+						<label>
+							<span>Feed type</span>
+							<input value={editFeedForm.type} onChange={(e) => setEditFeedForm({ ...editFeedForm, type: e.target.value })} />
+						</label>
+						{editFeedForm.entryType === "in" ? (
+							<>
+								<label>
+									<span>Total bags</span>
+									<input
+										type="number"
+										min="0"
+										value={editFeedForm.bagsIn}
+										onChange={(e) => setEditFeedForm({ ...editFeedForm, bagsIn: e.target.value })}
+									/>
+								</label>
+								<label>
+									<span>Total kg</span>
+									<input
+										type="number"
+										min="0"
+										step="0.01"
+										value={editFeedForm.kgIn}
+										onChange={(e) => setEditFeedForm({ ...editFeedForm, kgIn: e.target.value })}
+									/>
+								</label>
+							</>
+						) : (
+							<label>
+								<span>Kg used</span>
+								<input
+									type="number"
+									min="0"
+									step="0.01"
+									value={editFeedForm.kgOut}
+									onChange={(e) => setEditFeedForm({ ...editFeedForm, kgOut: e.target.value })}
+								/>
+							</label>
+						)}
+						<div className="grid-full" style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+							<button type="submit" disabled={savingEdit}>
+								{savingEdit ? "Saving..." : "Update entry"}
+							</button>
+							<button type="button" className="ghost" onClick={cancelFeedEdit}>
+								Cancel
+							</button>
+						</div>
+					</form>
+				</div>
+			)}
 
 			<div className="grid-2 gap">
 				<div className="card">
@@ -273,12 +416,13 @@ export default function Feed() {
 								<th>Kg in</th>
 								<th>Kg out</th>
 								<th>Batch</th>
+								<th>Actions</th>
 							</tr>
 						</thead>
 						<tbody>
 							{feedLogs.length === 0 && (
 								<tr>
-									<td colSpan="6" style={{ textAlign: "center" }}>
+									<td colSpan="7" style={{ textAlign: "center" }}>
 										{loading ? "Loading..." : "No feed entries"}
 									</td>
 								</tr>
@@ -293,6 +437,11 @@ export default function Feed() {
 									<td>{log.kgIn || "-"}</td>
 									<td>{log.kgOut || "-"}</td>
 									<td>{batchLabel || "-"}</td>
+									<td>
+										<button type="button" className="link" onClick={() => onEditFeed(log)}>
+											Edit
+										</button>
+									</td>
 								</tr>
 							);
 							})}

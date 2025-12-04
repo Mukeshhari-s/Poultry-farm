@@ -75,4 +75,70 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Update flock details
+router.patch('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { start_date, totalChicks, remarks } = req.body || {};
+
+    const flock = await Flock.findById(id);
+    if (!flock) return res.status(404).json({ error: 'Flock not found' });
+
+    if (start_date !== undefined) {
+      if (!start_date) return res.status(400).json({ error: 'start_date is required' });
+      const inputDate = new Date(start_date);
+      if (Number.isNaN(inputDate.getTime())) {
+        return res.status(400).json({ error: 'Invalid start_date' });
+      }
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      inputDate.setHours(0,0,0,0);
+      if (inputDate > today) return res.status(400).json({ error: 'start_date cannot be in the future' });
+      flock.start_date = inputDate;
+    }
+
+    if (totalChicks !== undefined) {
+      const parsedTotal = Number(totalChicks);
+      if (!Number.isFinite(parsedTotal) || parsedTotal <= 0) {
+        return res.status(400).json({ error: 'totalChicks must be a number > 0' });
+      }
+      flock.totalChicks = parsedTotal;
+    }
+
+    if (remarks !== undefined) {
+      flock.remarks = remarks;
+    }
+
+    const saved = await flock.save();
+    res.json(saved);
+  } catch (err) {
+    console.error('Update flock error', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Close a flock (mark batch completed)
+router.patch('/:id/close', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { remarks } = req.body || {};
+
+    const flock = await Flock.findById(id);
+    if (!flock) return res.status(404).json({ error: 'Flock not found' });
+    if (flock.status === 'closed') {
+      return res.status(400).json({ error: 'Batch already closed' });
+    }
+
+    flock.status = 'closed';
+    flock.closedAt = new Date();
+    if (remarks) flock.closeRemarks = remarks;
+
+    const saved = await flock.save();
+    res.json(saved);
+  } catch (err) {
+    console.error('Close flock error', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

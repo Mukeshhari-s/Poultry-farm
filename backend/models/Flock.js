@@ -6,6 +6,8 @@ const FlockSchema = new mongoose.Schema({
   totalChicks: { type: Number, required: true },
   status: { type: String, enum: ['active','closed'], default: 'active' },
   remarks: { type: String },
+  closedAt: { type: Date },
+  closeRemarks: { type: String },
 }, {
   timestamps: true
 });

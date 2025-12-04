@@ -67,4 +67,41 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Update daily monitoring entry (limited fields)
+router.patch('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { mortality, feedBags, feedKg, avgWeight, remarks } = req.body || {};
+
+    const rec = await DailyMonitoring.findById(id);
+    if (!rec) return res.status(404).json({ error: 'Daily record not found' });
+
+    const updateNumber = (field, value, options = { min: 0 }) => {
+      if (value === undefined) return;
+      const num = Number(value);
+      if (!Number.isFinite(num) || num < options.min) {
+        throw new Error(`${field} must be >= ${options.min}`);
+      }
+      rec[field] = num;
+    };
+
+    try {
+      updateNumber('mortality', mortality);
+      updateNumber('feedBags', feedBags);
+      updateNumber('feedKg', feedKg);
+      updateNumber('avgWeight', avgWeight);
+    } catch (validationError) {
+      return res.status(400).json({ error: validationError.message });
+    }
+
+    if (remarks !== undefined) rec.remarks = remarks;
+
+    const saved = await rec.save();
+    res.json(saved);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

@@ -11,6 +11,7 @@ export default function Chicks() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [editingFlock, setEditingFlock] = useState(null);
 
   const batchesCount = useMemo(() => flocks.length, [flocks]);
 
@@ -57,18 +58,43 @@ export default function Chicks() {
       const payload = {
         start_date: form.start_date,
         totalChicks: Number(form.totalChicks),
-        remarks: form.remarks || undefined,
+        remarks: form.remarks || "",
       };
-      await flockApi.create(payload);
-      const updated = await fetchFlocks();
-      const latestLabel = updated[0]?.displayLabel || "New batch";
-      setSuccess(`${latestLabel} created.`);
+
+      if (editingFlock) {
+        await flockApi.update(editingFlock._id, payload);
+        await fetchFlocks();
+        setSuccess(`${editingFlock.displayLabel || "Batch"} updated.`);
+        setEditingFlock(null);
+      } else {
+        await flockApi.create(payload);
+        const updated = await fetchFlocks();
+        const latestLabel = updated[0]?.displayLabel || "New batch";
+        setSuccess(`${latestLabel} created.`);
+      }
+
       setForm({ start_date: today, totalChicks: "", remarks: "" });
     } catch (err) {
       setError(err.response?.data?.error || err.message || "Unable to save batch");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const onEdit = (flock) => {
+    setEditingFlock(flock);
+    setForm({
+      start_date: flock.start_date ? flock.start_date.slice(0, 10) : today,
+      totalChicks: flock.totalChicks?.toString() || "",
+      remarks: flock.remarks || "",
+    });
+    setSuccess("");
+    setError("");
+  };
+
+  const cancelEdit = () => {
+    setEditingFlock(null);
+    setForm({ start_date: today, totalChicks: "", remarks: "" });
   };
 
   return (
@@ -115,10 +141,15 @@ export default function Chicks() {
               onChange={onChange}
             />
           </label>
-          <div className="grid-full">
+          <div className="grid-full" style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
             <button type="submit" disabled={submitting}>
-              {submitting ? "Saving..." : "Create batch"}
+              {submitting ? "Saving..." : editingFlock ? "Update batch" : "Create batch"}
             </button>
+            {editingFlock && (
+              <button type="button" className="ghost" onClick={cancelEdit}>
+                Cancel edit
+              </button>
+            )}
           </div>
         </form>
         {error && <div className="error mt">{error}</div>}
@@ -136,6 +167,7 @@ export default function Chicks() {
                 <th>Total chicks</th>
                 <th>Status</th>
                 <th>Remarks</th>
+                <th style={{ width: "90px" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -153,6 +185,11 @@ export default function Chicks() {
                   <td>{flock.totalChicks}</td>
                   <td>{flock.status}</td>
                   <td>{flock.remarks || "-"}</td>
+                  <td>
+                    <button type="button" className="link" onClick={() => onEdit(flock)}>
+                      Edit
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
