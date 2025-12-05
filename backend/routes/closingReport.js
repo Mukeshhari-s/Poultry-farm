@@ -13,16 +13,17 @@ function safeNum(v){ return Number(v || 0); }
 
 router.get('/', async (req, res) => {
   try {
+    const ownerId = req.user._id;
     // Optionally accept flockId or date range via query params
     const { flockId } = req.query;
 
     // 1) Get flock info (total chicks)
-    const flockQuery = flockId ? { _id: flockId } : {};
+    const flockQuery = flockId ? { _id: flockId, owner: ownerId } : { owner: ownerId };
     const flock = await Flock.findOne(flockQuery).lean();
     const totalChicks = flock ? safeNum(flock.total || flock.chicks || flock.count) : 0;
 
     // 2) Fetch ordered daily monitoring (daywise)
-    const dmQuery = flockId ? { flock: flockId } : {};
+    const dmQuery = flock ? { batch_no: flock.batch_no, owner: ownerId } : { owner: ownerId };
     const daily = await DailyMonitoring.find(dmQuery).sort({ date: 1 }).lean();
 
     // 3) Sum total mortality cumulative
@@ -49,14 +50,14 @@ router.get('/', async (req, res) => {
     });
 
     // 4) Total feed in / out and remaining
-    const feedQuery = flockId ? { flock: flockId } : {};
+    const feedQuery = flock ? { owner: ownerId, $or: [{ flockId: flock._id }, { batch_no: flock.batch_no }] } : { owner: ownerId };
     const feedRecords = await Feed.find(feedQuery).lean();
     const totalFeedIn = feedRecords.reduce((s, f) => s + safeNum(f.in_kg || f.qty_kg || f.qty || 0), 0);
     const totalFeedOut = feedRecords.reduce((s, f) => s + safeNum(f.out_kg || f.out || 0), 0);
     const feedRemaining = totalFeedIn - totalFeedOut;
 
     // 5) Medicine grouped by date
-    const medQuery = flockId ? { flock: flockId } : {};
+    const medQuery = flock ? { batch_no: flock.batch_no, owner: ownerId } : { owner: ownerId };
     const meds = await Medicine.find(medQuery).lean();
     const medicineByDate = {};
     meds.forEach(m => {
@@ -66,7 +67,7 @@ router.get('/', async (req, res) => {
     });
 
     // 6) Sales (if needed for remaining birds or weight)
-    const saleQuery = flockId ? { flock: flockId } : {};
+    const saleQuery = flock ? { batch_no: flock.batch_no, owner: ownerId } : { owner: ownerId };
     const sales = await Sale.find(saleQuery).lean();
     const totalBirdsSold = sales.reduce((s, x) => s + safeNum(x.birds || x.count || x.qty), 0);
     const totalWeightSold = sales.reduce((s, x) => s + safeNum(x.weight || x.total_weight || 0), 0);

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const Feed = require('../models/Feed'); // make sure this matches models/Feed.jsconsole.log('Feed model loaded:', !!Feed && Feed.modelName ? Feed.modelName : typeof Feed);
+const Feed = require('../models/Feed');
+const Flock = require('../models/Flock');
 function isFutureDate(d) {
   if (!d) return false;
   const input = new Date(d);
@@ -13,18 +14,75 @@ function isFutureDate(d) {
   return input > today;
 }
 
+function roundKg(value) {
+  return Math.round(value * 1000) / 1000;
+}
+
+function normalizeType(value) {
+  if (value === undefined || value === null) return { display: '', key: '' };
+  const display = String(value).trim();
+  if (!display) return { display: '', key: '' };
+  return { display, key: display.toLowerCase() };
+}
+
+async function getFeedBalance({ ownerId, flockId }) {
+  const match = { owner: ownerId };
+  if (flockId) match.flockId = flockId;
+
+  const stats = await Feed.aggregate([
+    { $match: match },
+    {
+      $group: {
+        _id: null,
+        totalIn: { $sum: '$kgIn' },
+        totalOut: { $sum: '$kgOut' }
+      }
+    }
+  ]);
+  const [totals] = stats;
+  const inKg = totals?.totalIn || 0;
+  const outKg = totals?.totalOut || 0;
+  return inKg - outKg;
+}
+
 
 // Feed IN
 router.post('/in', async (req, res) => {
-  console.log('POST /api/feed/in called - body:', req.body);
   try {
-    const { type, date, bagsIn = 0, kgIn = 0, flockId } = req.body;
+    const ownerId = req.user._id;
+    const { type, date, bagsIn = 0, kgPerBag = 0, flockId } = req.body;
     if (!type) return res.status(400).json({ error: 'type is required' });
+    const { display: normalizedType, key: typeKey } = normalizeType(type);
+    if (!normalizedType) return res.status(400).json({ error: 'type is required' });
     if (isFutureDate(date)) return res.status(400).json({ error: 'date cannot be in the future' });
-    if (bagsIn < 0 || kgIn < 0) return res.status(400).json({ error: 'bagsIn/kgIn cannot be negative' });
 
-    
-    const feed = new Feed({ type, date: date || new Date(), bagsIn, kgIn, flockId });
+    const bagsValue = Number(bagsIn ?? 0);
+    const kgPerBagValue = Number(kgPerBag ?? 0);
+    if (!Number.isFinite(bagsValue) || bagsValue < 0) return res.status(400).json({ error: 'bagsIn cannot be negative' });
+    if (!Number.isFinite(kgPerBagValue) || kgPerBagValue < 0) return res.status(400).json({ error: 'kgPerBag cannot be negative' });
+    if (bagsValue > 0 && kgPerBagValue === 0) {
+      return res.status(400).json({ error: 'kgPerBag is required when bagsIn is provided' });
+    }
+
+    const kgIn = roundKg(bagsValue * kgPerBagValue);
+
+    let flockDoc = null;
+    if (flockId) {
+      flockDoc = await Flock.findOne({ _id: flockId, owner: ownerId });
+      if (!flockDoc) return res.status(404).json({ error: 'Batch not found' });
+    }
+
+    const feed = new Feed({
+      owner: ownerId,
+      type: normalizedType,
+      typeKey,
+      date: date ? new Date(date) : new Date(),
+      bagsIn: bagsValue,
+      kgPerBag: kgPerBagValue,
+      kgIn,
+      flockId: flockDoc?._id || null,
+      batch_no: flockDoc?.batch_no || null,
+    });
     await feed.save();
     res.status(201).json(feed);
   } catch (err) {
@@ -35,14 +93,51 @@ router.post('/in', async (req, res) => {
 
 // Feed OUT
 router.post('/out', async (req, res) => {
-  console.log('POST /api/feed/out called - body:', req.body);
   try {
-    const { type, date, kgOut = 0, flockId } = req.body;
+    const ownerId = req.user._id;
+    const { type, date, bagsOut = 0, kgPerBag = 0, flockId } = req.body;
     if (!type) return res.status(400).json({ error: 'type is required' });
+    const { display: normalizedType, key: typeKey } = normalizeType(type);
+    if (!normalizedType) return res.status(400).json({ error: 'type is required' });
     if (isFutureDate(date)) return res.status(400).json({ error: 'date cannot be in the future' });
-    if (kgOut <= 0) return res.status(400).json({ error: 'kgOut must be greater than 0' });
 
-    const feed = new Feed({ type, date: date || new Date(), kgOut, flockId });
+    const bagsValue = Number(bagsOut ?? 0);
+    const kgPerBagValue = Number(kgPerBag ?? 0);
+    if (!Number.isFinite(bagsValue) || bagsValue <= 0) {
+      return res.status(400).json({ error: 'bagsOut must be greater than 0' });
+    }
+    if (!Number.isFinite(kgPerBagValue) || kgPerBagValue <= 0) {
+      return res.status(400).json({ error: 'kgPerBag must be greater than 0 for feed out' });
+    }
+
+    const kgOutValue = roundKg(bagsValue * kgPerBagValue);
+    if (kgOutValue <= 0) {
+      return res.status(400).json({ error: 'Computed kgOut must be greater than 0' });
+    }
+
+    let flockDoc = null;
+    if (flockId) {
+      flockDoc = await Flock.findOne({ _id: flockId, owner: ownerId });
+      if (!flockDoc) return res.status(404).json({ error: 'Batch not found' });
+    }
+
+    const availableFeedKg = await getFeedBalance({ ownerId, flockId: flockDoc?._id });
+    if (kgOutValue > availableFeedKg + 1e-6) {
+      const formatted = Math.max(availableFeedKg, 0).toFixed(2);
+      return res.status(400).json({ error: `Only ${formatted} kg available for ${normalizedType}${flockDoc ? ` in ${flockDoc.batch_no}` : ''}` });
+    }
+
+    const feed = new Feed({
+      owner: ownerId,
+      type: normalizedType,
+      typeKey,
+      date: date ? new Date(date) : new Date(),
+      bagsOut: bagsValue,
+      kgPerBag: kgPerBagValue,
+      kgOut: kgOutValue,
+      flockId: flockDoc?._id || null,
+      batch_no: flockDoc?.batch_no || null,
+    });
     await feed.save();
     res.status(201).json(feed);
   } catch (err) {
@@ -53,10 +148,12 @@ router.post('/out', async (req, res) => {
 
 // List all feed logs
 router.get('/', async (req, res) => {
-  console.log('GET /api/feed called - query:', req.query);
   try {
-    const { flockId } = req.query;
-    const q = flockId ? { flockId } : {};
+    const ownerId = req.user._id;
+    const { flockId, batch_no } = req.query;
+    const q = { owner: ownerId };
+    if (flockId) q.flockId = flockId;
+    if (batch_no) q.batch_no = batch_no;
     const list = await Feed.find(q).sort({ date: -1 });
     res.json(list);
   } catch (err) {
@@ -68,15 +165,19 @@ router.get('/', async (req, res) => {
 // Update feed entry
 router.patch('/:id', async (req, res) => {
   try {
+    const ownerId = req.user._id;
     const { id } = req.params;
-    const { type, date, bagsIn, kgIn, kgOut, flockId } = req.body || {};
+    const { type, date, bagsIn, bagsOut, kgPerBag, kgIn, kgOut, flockId } = req.body || {};
 
-    const feed = await Feed.findById(id);
+    const feed = await Feed.findOne({ _id: id, owner: ownerId });
     if (!feed) return res.status(404).json({ error: 'Feed entry not found' });
 
     if (type !== undefined) {
       if (!type) return res.status(400).json({ error: 'type is required' });
-      feed.type = type;
+      const { display: normalizedType, key: typeKey } = normalizeType(type);
+      if (!normalizedType) return res.status(400).json({ error: 'type is required' });
+      feed.type = normalizedType;
+      feed.typeKey = typeKey;
     }
 
     if (date !== undefined) {
@@ -87,26 +188,67 @@ router.patch('/:id', async (req, res) => {
       feed.date = parsedDate;
     }
 
+    let shouldRecomputeKgIn = false;
+    let shouldRecomputeKgOut = false;
+
     if (bagsIn !== undefined) {
       const value = Number(bagsIn);
-      if (value < 0) return res.status(400).json({ error: 'bagsIn cannot be negative' });
+      if (!Number.isFinite(value) || value < 0) return res.status(400).json({ error: 'bagsIn cannot be negative' });
       feed.bagsIn = value;
+      shouldRecomputeKgIn = true;
     }
 
-    if (kgIn !== undefined) {
+    if (bagsOut !== undefined) {
+      const value = Number(bagsOut);
+      if (!Number.isFinite(value) || value < 0) return res.status(400).json({ error: 'bagsOut cannot be negative' });
+      feed.bagsOut = value;
+      shouldRecomputeKgOut = true;
+    }
+
+    if (kgPerBag !== undefined) {
+      const value = Number(kgPerBag);
+      if (!Number.isFinite(value) || value < 0) return res.status(400).json({ error: 'kgPerBag cannot be negative' });
+      feed.kgPerBag = value;
+      if (feed.bagsIn > 0) shouldRecomputeKgIn = true;
+      if (feed.bagsOut > 0) shouldRecomputeKgOut = true;
+    }
+
+    if (!shouldRecomputeKgIn && kgIn !== undefined) {
       const value = Number(kgIn);
-      if (value < 0) return res.status(400).json({ error: 'kgIn cannot be negative' });
+      if (!Number.isFinite(value) || value < 0) return res.status(400).json({ error: 'kgIn cannot be negative' });
       feed.kgIn = value;
     }
 
-    if (kgOut !== undefined) {
+    if (shouldRecomputeKgIn) {
+      if (feed.bagsIn > 0 && feed.kgPerBag === 0) {
+        return res.status(400).json({ error: 'kgPerBag is required when bagsIn is provided' });
+      }
+      feed.kgIn = roundKg(feed.bagsIn * (feed.kgPerBag || 0));
+    }
+
+    if (!shouldRecomputeKgOut && kgOut !== undefined) {
       const value = Number(kgOut);
-      if (value < 0) return res.status(400).json({ error: 'kgOut cannot be negative' });
+      if (!Number.isFinite(value) || value < 0) return res.status(400).json({ error: 'kgOut cannot be negative' });
       feed.kgOut = value;
     }
 
+    if (shouldRecomputeKgOut) {
+      if (feed.bagsOut > 0 && feed.kgPerBag === 0) {
+        return res.status(400).json({ error: 'kgPerBag is required when bagsOut is provided' });
+      }
+      feed.kgOut = roundKg(feed.bagsOut * (feed.kgPerBag || 0));
+    }
+
     if (flockId !== undefined) {
-      feed.flockId = flockId;
+      if (!flockId) {
+        feed.flockId = null;
+        feed.batch_no = null;
+      } else {
+        const flockDoc = await Flock.findOne({ _id: flockId, owner: ownerId });
+        if (!flockDoc) return res.status(404).json({ error: 'Batch not found' });
+        feed.flockId = flockDoc._id;
+        feed.batch_no = flockDoc.batch_no;
+      }
     }
 
     const saved = await feed.save();

@@ -8,20 +8,20 @@ const DailyMonitoring = require('../models/DailyMonitoring');
 function strip(d){ const x=new Date(d); x.setHours(0,0,0,0); return x; }
 
 // compute remaining birds for a batch
-async function getRemainingBirds(batch_no) {
-  const batch = await Flock.findOne({ batch_no });
+async function getRemainingBirds(batch_no, ownerId) {
+  const batch = await Flock.findOne({ batch_no, owner: ownerId });
   if (!batch) throw new Error('batch_not_found');
 
   // sum mortality from daily monitoring
   const mortAgg = await DailyMonitoring.aggregate([
-    { $match: { batch_no } },
+    { $match: { batch_no, owner: ownerId } },
     { $group: { _id: null, totalMort: { $sum: '$mortality' } } }
   ]);
   const totalMort = mortAgg[0] ? mortAgg[0].totalMort : 0;
 
   // sum birds sold
   const soldAgg = await Sale.aggregate([
-    { $match: { batch_no } },
+    { $match: { batch_no, owner: ownerId } },
     { $group: { _id: null, totalSold: { $sum: '$birds' } } }
   ]);
   const totalSold = soldAgg[0] ? soldAgg[0].totalSold : 0;
@@ -33,6 +33,7 @@ async function getRemainingBirds(batch_no) {
 // Create sale
 router.post('/', async (req, res) => {
   try {
+    const ownerId = req.user._id;
     const { batch_no, date, vehicle_no = '', cages, birds, total_weight, remarks } = req.body;
 
     if (!batch_no) return res.status(400).json({ error: 'batch_no is required' });
@@ -46,7 +47,7 @@ router.post('/', async (req, res) => {
     if (inputDate > today) return res.status(400).json({ error: 'date cannot be in the future' });
 
     // ensure batch exists & is active (or we may allow sales from closed batches depending on requirement)
-    const batch = await Flock.findOne({ batch_no });
+    const batch = await Flock.findOne({ batch_no, owner: ownerId });
     if (!batch) return res.status(400).json({ error: 'batch_no not found' });
 
     // optional: reject sale before batch start_date
@@ -59,13 +60,14 @@ router.post('/', async (req, res) => {
     if (!Number.isFinite(total_weight) || total_weight <= 0) return res.status(400).json({ error: 'total_weight must be > 0' });
 
     // compute remaining
-    const { remaining } = await getRemainingBirds(batch_no);
+    const { remaining } = await getRemainingBirds(batch_no, ownerId);
     if (birds > remaining) {
       return res.status(400).json({ error: `not enough birds. Remaining: ${remaining}` });
     }
 
     // create sale record
     const sale = new Sale({
+      owner: ownerId,
       batch_no, date: inputDate, vehicle_no, cages, birds, total_weight, remarks
     });
     const saved = await sale.save();
@@ -81,8 +83,9 @@ router.post('/', async (req, res) => {
 // List sales (optionally filter by batch_no)
 router.get('/', async (req, res) => {
   try {
+    const ownerId = req.user._id;
     const { batch_no } = req.query;
-    const q = {};
+    const q = { owner: ownerId };
     if (batch_no) q.batch_no = batch_no;
     const list = await Sale.find(q).sort({ date: -1, createdAt: -1 });
     return res.json(list);
@@ -95,7 +98,7 @@ router.get('/', async (req, res) => {
 // Get remaining summary for a batch
 router.get('/remaining/:batch_no', async (req, res) => {
   try {
-    const info = await getRemainingBirds(req.params.batch_no);
+    const info = await getRemainingBirds(req.params.batch_no, req.user._id);
     return res.json(info);
   } catch (err) {
     console.error(err);
@@ -106,10 +109,11 @@ router.get('/remaining/:batch_no', async (req, res) => {
 // Update sale entry
 router.patch('/:id', async (req, res) => {
   try {
+    const ownerId = req.user._id;
     const { id } = req.params;
     const { date, vehicle_no, cages, birds, total_weight, remarks } = req.body || {};
 
-    const sale = await Sale.findById(id);
+    const sale = await Sale.findOne({ _id: id, owner: ownerId });
     if (!sale) return res.status(404).json({ error: 'Sale entry not found' });
 
     if (date !== undefined) {
@@ -117,7 +121,7 @@ router.patch('/:id', async (req, res) => {
       const parsed = strip(date);
       const today = strip(new Date());
       if (parsed > today) return res.status(400).json({ error: 'date cannot be in the future' });
-      const batch = await Flock.findOne({ batch_no: sale.batch_no });
+      const batch = await Flock.findOne({ batch_no: sale.batch_no, owner: ownerId });
       if (!batch) return res.status(400).json({ error: 'batch_no not found' });
       if (parsed < strip(batch.start_date)) return res.status(400).json({ error: 'sale date cannot be before batch start_date' });
       sale.date = parsed;
@@ -141,7 +145,7 @@ router.patch('/:id', async (req, res) => {
     if (birds !== undefined) {
       const value = Number(birds);
       if (!Number.isFinite(value) || value <= 0) return res.status(400).json({ error: 'birds must be > 0' });
-      const { remaining } = await getRemainingBirds(sale.batch_no);
+      const { remaining } = await getRemainingBirds(sale.batch_no, ownerId);
       const available = remaining + sale.birds; // add back previous value
       if (value > available) {
         return res.status(400).json({ error: `not enough birds. Remaining: ${available}` });

@@ -1,5 +1,5 @@
 import React from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 const links = [
@@ -37,7 +37,10 @@ export default function MainLayout() {
       <div className="content-area">
         <header className="topbar">
           <div className="spacer" />
-          <div>
+          <div className="header-actions">
+            <Link to="/final-report" className="ghost">
+              Farm closing report
+            </Link>
             <span className="user-name">{user?.name}</span>
             <button onClick={logout} className="ghost">
               Logout

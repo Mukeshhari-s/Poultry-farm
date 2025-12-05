@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import useFlocks from "../hooks/useFlocks";
 import { reportApi } from "../services/api";
+import { Link } from "react-router-dom";
 
 export default function Dashboard() {
   const { flocks } = useFlocks();
@@ -29,6 +30,11 @@ export default function Dashboard() {
         <div>
           <h1>Dashboard</h1>
           <p>Monitor your poultry farm at a glance.</p>
+        </div>
+        <div className="header-actions">
+          <Link to="/final-report" className="ghost">
+            Farm closing report
+          </Link>
         </div>
       </div>
 

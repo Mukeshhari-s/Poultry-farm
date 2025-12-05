@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import useFlocks from "../hooks/useFlocks";
 import { flockApi, reportApi } from "../services/api";
 
+const MIN_CLOSING_AGE = 40;
+
 export default function FinalReport() {
 	const { flocks, refreshFlocks } = useFlocks();
 	const [selectedFlockId, setSelectedFlockId] = useState("");
@@ -65,6 +67,13 @@ export default function FinalReport() {
 	};
 
 	const rows = data?.rows || [];
+	const latestAge = useMemo(() => {
+		if (!rows.length) return null;
+		const lastRow = rows[rows.length - 1];
+		return typeof lastRow.age === "number" ? lastRow.age : null;
+	}, [rows]);
+	const meetsClosingRequirement = latestAge !== null && latestAge >= MIN_CLOSING_AGE;
+
 	const summaryCards = [
 		{ label: "Total chicks in", value: data?.totalChicks ?? "-" },
 		{ label: "Remaining chicks", value: data?.remainingChicks ?? "-" },
@@ -118,9 +127,15 @@ export default function FinalReport() {
 									placeholder="Notes about this closure"
 								/>
 							</label>
-							<button type="submit" disabled={closing}>
+							<button type="submit" disabled={closing || !meetsClosingRequirement}>
 								{closing ? "Closing..." : "Mark batch as closed"}
 							</button>
+							{!meetsClosingRequirement && (
+								<p className="muted">
+									Need minimum {MIN_CLOSING_AGE}-day monitoring entry before closing. Latest recorded age:
+									<strong> {latestAge ?? "N/A"}</strong> days.
+								</p>
+							)}
 						</form>
 					)}
 					{closeError && <div className="error mt">{closeError}</div>}

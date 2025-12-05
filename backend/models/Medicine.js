@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const MedicineSchema = new mongoose.Schema({
+  owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   batch_no: {
     type: String,
     required: true

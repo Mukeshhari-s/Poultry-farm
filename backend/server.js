@@ -27,14 +27,14 @@ app.get('/api/me', authMiddleware, (req, res) => {
 });
 
 // your routes ---------------------------
-app.use('/api/flocks', require('./routes/flocks'));
-app.use('/api/feed', require('./routes/feed'));
-app.use('/api/medicine', require('./routes/medicine'));   // ✔ THIS ONE
-app.use('/api/daily', require('./routes/dailyMonitoring'));
-app.use('/api/sale', require('./routes/sale'));
-app.use('/api/current-report', require('./routes/currentReport'));
-app.use('/api/closing-report', require('./routes/closingReport'));
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/flocks', authMiddleware, require('./routes/flocks'));
+app.use('/api/feed', authMiddleware, require('./routes/feed'));
+app.use('/api/medicine', authMiddleware, require('./routes/medicine'));
+app.use('/api/daily', authMiddleware, require('./routes/dailyMonitoring'));
+app.use('/api/sale', authMiddleware, require('./routes/sale'));
+app.use('/api/current-report', authMiddleware, require('./routes/currentReport'));
+app.use('/api/closing-report', authMiddleware, require('./routes/closingReport'));
 
 // ----------------------------------------
 

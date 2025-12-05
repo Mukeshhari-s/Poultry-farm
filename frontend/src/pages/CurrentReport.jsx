@@ -74,11 +74,15 @@ export default function CurrentReport() {
 					</div>
 					<div className="stat-card">
 						<span>Feed in (kg)</span>
-						<strong>{summary.totalFeedIn}</strong>
+						<strong>{summary.totalFeedIn ?? 0}</strong>
+					</div>
+					<div className="stat-card">
+						<span>Feed out (kg)</span>
+						<strong>{summary.totalFeedOut ?? 0}</strong>
 					</div>
 					<div className="stat-card">
 						<span>Feed used (kg)</span>
-						<strong>{summary.totalFeedOut}</strong>
+						<strong>{summary.totalFeedUsed ?? 0}</strong>
 					</div>
 					<div className="stat-card">
 						<span>Feed remaining (kg)</span>

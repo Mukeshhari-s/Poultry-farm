@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const FlockSchema = new mongoose.Schema({
+  owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   batch_no: { type: String, unique: true, index: true },
   start_date: { type: Date, required: true },
   totalChicks: { type: Number, required: true },

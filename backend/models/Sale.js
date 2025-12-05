@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 
 const SaleSchema = new mongoose.Schema({
+  owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   batch_no: { type: String, required: true, index: true },
   date: { type: Date, required: true },
   vehicle_no: { type: String, default: '' },   // optional

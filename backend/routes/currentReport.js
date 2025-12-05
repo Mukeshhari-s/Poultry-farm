@@ -21,20 +21,21 @@ function formatPct(n) {
 // GET /api/current-report?flockId=<id>&batch_no=<batch_no>
 router.get('/', async (req, res) => {
   try {
+    const ownerId = req.user._id;
     const { flockId, batch_no } = req.query;
 
     // 1) resolve flock
     let flock;
-    if (flockId) flock = await Flock.findById(flockId).lean();
-    else if (batch_no) flock = await Flock.findOne({ batch_no }).lean();
-    else flock = await Flock.findOne({ status: 'active' }).sort({ start_date: -1 }).lean();
+    if (flockId) flock = await Flock.findOne({ _id: flockId, owner: ownerId }).lean();
+    else if (batch_no) flock = await Flock.findOne({ batch_no, owner: ownerId }).lean();
+    else flock = await Flock.findOne({ status: 'active', owner: ownerId }).sort({ start_date: -1 }).lean();
 
     if (!flock) return res.status(404).json({ error: 'Flock/batch not found' });
 
     const totalChicks = safeNum(flock.totalChicks || flock.total || flock.count || 0);
 
     // 2) fetch daily monitoring ordered by date asc
-    const dmQuery = { batch_no: flock.batch_no };
+    const dmQuery = { batch_no: flock.batch_no, owner: ownerId };
     const daily = await DailyMonitoring.find(dmQuery).sort({ date: 1 }).lean();
 
     // 3) compute day-wise rows with cumulative mortality, feed per bird etc.
@@ -73,21 +74,24 @@ router.get('/', async (req, res) => {
 
     // 4) feed totals (in / out / remaining)
     const feedQuery = flock._id
-      ? { $or: [{ flockId: flock._id }, { batch_no: flock.batch_no }] }
-      : { batch_no: flock.batch_no };
+      ? { owner: ownerId, $or: [{ flockId: flock._id }, { batch_no: flock.batch_no }] }
+      : { owner: ownerId, batch_no: flock.batch_no };
     const feedRecords = await Feed.find(feedQuery).lean();
-    const totalFeedIn = feedRecords.reduce(
-      (s, f) => s + safeNum(f.kgIn || f.in_kg || f.qty_kg || f.qty || f.inKg || 0),
-      0
-    );
-    const totalFeedOut = feedRecords.reduce(
-      (s, f) => s + safeNum(f.kgOut || f.out_kg || f.out || f.used_kg || 0),
-      0
-    );
-    const feedRemaining = totalFeedIn - totalFeedOut;
+    let totalFeedIn = 0;
+    let totalFeedOut = 0;        // feed route withdrawals
+    let totalFeedUsed = 0;       // daily monitoring usage
+    feedRecords.forEach((f) => {
+      totalFeedIn += safeNum(f.kgIn || f.in_kg || f.qty_kg || f.qty || f.inKg || 0);
+      const outKg = safeNum(f.kgOut || f.out_kg || f.out || f.used_kg || 0);
+      if (outKg > 0) {
+        if (f.dailyRecord) totalFeedUsed += outKg;
+        else totalFeedOut += outKg;
+      }
+    });
+    const feedRemaining = totalFeedIn - totalFeedOut - totalFeedUsed;
 
     // 5) medicine grouped by date
-    const meds = await Medicine.find({ batch_no: flock.batch_no }).lean();
+    const meds = await Medicine.find({ batch_no: flock.batch_no, owner: ownerId }).lean();
     const medicineByDate = {};
     meds.forEach(m => {
       const key = m.date ? m.date.toISOString().slice(0,10) : 'unknown';
@@ -102,7 +106,7 @@ router.get('/', async (req, res) => {
     });
 
     // 6) sales summary
-    const sales = await Sale.find({ batch_no: flock.batch_no }).lean();
+    const sales = await Sale.find({ batch_no: flock.batch_no, owner: ownerId }).lean();
     const totalBirdsSold = sales.reduce((s, x) => s + safeNum(x.birds || x.count || x.qty), 0);
     const totalWeightSold = sales.reduce((s, x) => s + safeNum(x.weight || x.total_weight || x.kg), 0);
 
@@ -121,6 +125,7 @@ router.get('/', async (req, res) => {
         remainingChicks,
         totalFeedIn,
         totalFeedOut,
+        totalFeedUsed,
         feedRemaining,
         totalBirdsSold,
         totalWeightSold,

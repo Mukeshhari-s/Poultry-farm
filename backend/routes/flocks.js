@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const Flock = require('../models/Flock');
+const DailyMonitoring = require('../models/DailyMonitoring');
+
+const MIN_CLOSING_AGE = 40;
 
 // Helper: format YYYYMMDD
 function ymd(d) {
@@ -14,6 +17,7 @@ function ymd(d) {
 // Create new flock (chicks entry)
 router.post('/', async (req, res) => {
   try {
+    const ownerId = req.user._id;
     const { start_date, totalChicks, remarks } = req.body;
 
     // basic presence check
@@ -38,6 +42,7 @@ router.post('/', async (req, res) => {
 
     // create base document (without batch_no)
     const f = new Flock({
+      owner: ownerId,
       start_date: inputDate,
       totalChicks,
       remarks
@@ -68,7 +73,7 @@ router.post('/', async (req, res) => {
 // List all flocks (newest first)
 router.get('/', async (req, res) => {
   try {
-    const list = await Flock.find().sort({ createdAt: -1 });
+    const list = await Flock.find({ owner: req.user._id }).sort({ createdAt: -1 });
     res.json(list);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -81,7 +86,7 @@ router.patch('/:id', async (req, res) => {
     const { id } = req.params;
     const { start_date, totalChicks, remarks } = req.body || {};
 
-    const flock = await Flock.findById(id);
+    const flock = await Flock.findOne({ _id: id, owner: req.user._id });
     if (!flock) return res.status(404).json({ error: 'Flock not found' });
 
     if (start_date !== undefined) {
@@ -123,10 +128,19 @@ router.patch('/:id/close', async (req, res) => {
     const { id } = req.params;
     const { remarks } = req.body || {};
 
-    const flock = await Flock.findById(id);
+    const flock = await Flock.findOne({ _id: id, owner: req.user._id });
     if (!flock) return res.status(404).json({ error: 'Flock not found' });
     if (flock.status === 'closed') {
       return res.status(400).json({ error: 'Batch already closed' });
+    }
+
+    const latestDaily = await DailyMonitoring.findOne({ batch_no: flock.batch_no, owner: req.user._id }).sort({ age: -1, date: -1 });
+    const latestAge = typeof latestDaily?.age === 'number' ? latestDaily.age : null;
+    if (latestAge === null || latestAge < MIN_CLOSING_AGE) {
+      return res.status(400).json({
+        error: `Minimum ${MIN_CLOSING_AGE} day monitoring entry required before closing this batch`,
+        latestAge,
+      });
     }
 
     flock.status = 'closed';

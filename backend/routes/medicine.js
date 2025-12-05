@@ -7,7 +7,7 @@ const Flock = require("../models/Flock");
 router.get("/batches", async (req, res) => {
   try {
     const batches = await Flock.find(
-      { status: "active" },
+      { status: "active", owner: req.user._id },
       { batch_no: 1, _id: 0 }
     );
 
@@ -21,9 +21,14 @@ router.get("/batches", async (req, res) => {
 // ✅ ADD medicine (MongoDB version)
 router.post("/", async (req, res) => {
   try {
+    const ownerId = req.user._id;
     const { batch_no, date, medicine_name, quantity, dose } = req.body;
 
+    const batch = await Flock.findOne({ batch_no, owner: ownerId });
+    if (!batch) return res.status(404).json({ error: "Batch not found" });
+
     const med = new Medicine({
+      owner: ownerId,
       batch_no,
       date,
       medicine_name,
@@ -43,7 +48,7 @@ router.post("/", async (req, res) => {
 // ✅ GET all medicine data (MongoDB version)
 router.get("/", async (req, res) => {
   try {
-    const data = await Medicine.find().sort({ date: -1 });
+    const data = await Medicine.find({ owner: req.user._id }).sort({ date: -1 });
     res.json(data);
   } catch (err) {
     console.error("Error fetching medicine:", err);
@@ -54,13 +59,18 @@ router.get("/", async (req, res) => {
 // ✅ UPDATE medicine entry
 router.patch('/:id', async (req, res) => {
   try {
+    const ownerId = req.user._id;
     const { id } = req.params;
     const { batch_no, date, medicine_name, quantity, dose } = req.body || {};
 
-    const med = await Medicine.findById(id);
+    const med = await Medicine.findOne({ _id: id, owner: ownerId });
     if (!med) return res.status(404).json({ error: 'Medicine entry not found' });
 
-    if (batch_no !== undefined) med.batch_no = batch_no;
+    if (batch_no !== undefined) {
+      const batch = await Flock.findOne({ batch_no, owner: ownerId });
+      if (!batch) return res.status(404).json({ error: 'Batch not found' });
+      med.batch_no = batch_no;
+    }
     if (date !== undefined) {
       if (!date) return res.status(400).json({ error: 'date is required' });
       const parsedDate = new Date(date);

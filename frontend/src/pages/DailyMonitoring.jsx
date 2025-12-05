@@ -4,6 +4,12 @@ import { monitoringApi, reportApi } from "../services/api";
 
 const today = new Date().toISOString().slice(0, 10);
 
+const computeFeedKg = (bags, kgPerBag) => {
+	const total = Number(bags || 0) * Number(kgPerBag || 0);
+	if (!Number.isFinite(total)) return "0";
+	return (Math.round(total * 100) / 100).toFixed(2);
+};
+
 export default function DailyMonitoring() {
 	const { flocks } = useFlocks();
 	const [selectedBatch, setSelectedBatch] = useState("");
@@ -11,7 +17,7 @@ export default function DailyMonitoring() {
 		date: today,
 		mortality: "0",
 		feedBags: "0",
-		feedKg: "0",
+		kgPerBag: "0",
 		avgWeight: "0",
 		remarks: "",
 	});
@@ -21,7 +27,7 @@ export default function DailyMonitoring() {
 	const emptyEditForm = {
 		mortality: "",
 		feedBags: "",
-		feedKg: "",
+		kgPerBag: "",
 		avgWeight: "",
 		remarks: "",
 	};
@@ -40,7 +46,8 @@ export default function DailyMonitoring() {
 	}, [flocks, selectedBatch]);
 
 	const onChange = (e) => {
-		setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+		const { name, value } = e.target;
+		setForm((prev) => ({ ...prev, [name]: value }));
 	};
 
 	const loadReport = async (batch_no) => {
@@ -77,12 +84,14 @@ export default function DailyMonitoring() {
 		}
 		setSaving(true);
 		try {
+			const totalFeedKg = Number(computeFeedKg(form.feedBags, form.kgPerBag));
 			await monitoringApi.create({
 				batch_no: selectedBatch,
 				date: form.date,
 				mortality: Number(form.mortality || 0),
 				feedBags: Number(form.feedBags || 0),
-				feedKg: Number(form.feedKg || 0),
+				kgPerBag: Number(form.kgPerBag || 0),
+				feedKg: totalFeedKg,
 				avgWeight: Number(form.avgWeight || 0),
 				remarks: form.remarks,
 			});
@@ -91,7 +100,7 @@ export default function DailyMonitoring() {
 				...prev,
 				mortality: "0",
 				feedBags: "0",
-				feedKg: "0",
+				kgPerBag: "0",
 				avgWeight: "0",
 				remarks: "",
 			}));
@@ -110,7 +119,7 @@ export default function DailyMonitoring() {
 		setEditForm({
 			mortality: row.mortality?.toString() || "0",
 			feedBags: row.feedBags?.toString() || "0",
-			feedKg: row.feedKg?.toString() || "0",
+			kgPerBag: row.kgPerBag?.toString() || "0",
 			avgWeight: row.avgWeight === null || row.avgWeight === undefined ? "0" : row.avgWeight.toString(),
 			remarks: row.remarks || "",
 		});
@@ -124,7 +133,8 @@ export default function DailyMonitoring() {
 	};
 
 	const onEditChange = (e) => {
-		setEditForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+		const { name, value } = e.target;
+		setEditForm((prev) => ({ ...prev, [name]: value }));
 	};
 
 	const toNumber = (value) => Number(value || 0);
@@ -136,10 +146,12 @@ export default function DailyMonitoring() {
 		setError("");
 		setSuccess("");
 		try {
+			const totalFeedKg = Number(computeFeedKg(editForm.feedBags, editForm.kgPerBag));
 			await monitoringApi.update(editingRow._id, {
 				mortality: toNumber(editForm.mortality),
 				feedBags: toNumber(editForm.feedBags),
-				feedKg: toNumber(editForm.feedKg),
+				kgPerBag: toNumber(editForm.kgPerBag),
+				feedKg: totalFeedKg,
 				avgWeight: toNumber(editForm.avgWeight),
 				remarks: editForm.remarks,
 			});
@@ -186,11 +198,11 @@ export default function DailyMonitoring() {
 					</label>
 					<label>
 						<span>Feed bags</span>
-						<input type="number" min="0" name="feedBags" value={form.feedBags} onChange={onChange} />
+						<input type="number" min="0" step="0.01" name="feedBags" value={form.feedBags} onChange={onChange} />
 					</label>
 					<label>
-						<span>Feed kg</span>
-						<input type="number" min="0" name="feedKg" value={form.feedKg} onChange={onChange} />
+						<span>Kg per bag</span>
+						<input type="number" min="0" step="0.01" name="kgPerBag" value={form.kgPerBag} onChange={onChange} />
 					</label>
 					<label>
 						<span>Average weight (kg)</span>
@@ -221,11 +233,11 @@ export default function DailyMonitoring() {
 						</label>
 						<label>
 							<span>Feed bags</span>
-							<input type="number" min="0" name="feedBags" value={editForm.feedBags} onChange={onEditChange} />
+							<input type="number" min="0" step="0.01" name="feedBags" value={editForm.feedBags} onChange={onEditChange} />
 						</label>
 						<label>
-							<span>Feed kg</span>
-							<input type="number" min="0" step="0.01" name="feedKg" value={editForm.feedKg} onChange={onEditChange} />
+							<span>Kg per bag</span>
+							<input type="number" min="0" step="0.01" name="kgPerBag" value={editForm.kgPerBag} onChange={onEditChange} />
 						</label>
 						<label>
 							<span>Average weight (kg)</span>
