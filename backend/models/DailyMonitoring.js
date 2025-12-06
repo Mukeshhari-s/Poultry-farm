@@ -4,6 +4,7 @@ const DailyMonitoringSchema = new mongoose.Schema({
   owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   batch_no: { type: String, required: true, index: true },
   date: { type: Date, required: true },
+  dateLabel: { type: String },
   age: { type: Number, required: true },            // 0 .. 55
   mortality: { type: Number, default: 0 },          // integer >= 0
   feedBags: { type: Number, default: 0 },           // bags (can be fractional)

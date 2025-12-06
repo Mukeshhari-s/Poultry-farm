@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Flock = require('../models/Flock');
 const DailyMonitoring = require('../models/DailyMonitoring');
+const { parseDateOnly } = require('../utils/date');
 
 const MIN_CLOSING_AGE = 40;
 
@@ -24,11 +25,11 @@ router.post('/', async (req, res) => {
     if (!start_date) return res.status(400).json({ error: "start_date is required" });
     if (totalChicks == null) return res.status(400).json({ error: "totalChicks is required" });
 
-    const inputDate = new Date(start_date);
+    const inputDate = parseDateOnly(start_date);
+    if (!inputDate) return res.status(400).json({ error: "Invalid start_date" });
     const today = new Date();
-    // strip time from today for fair compare
-    today.setHours(0,0,0,0);
-    inputDate.setHours(0,0,0,0);
+    // strip time in UTC for consistent comparisons
+    today.setUTCHours(0,0,0,0);
 
     // No future dates
     if (inputDate > today) {
@@ -38,6 +39,12 @@ router.post('/', async (req, res) => {
     // totalChicks positive
     if (!Number.isFinite(totalChicks) || totalChicks <= 0) {
       return res.status(400).json({ error: "totalChicks must be a number > 0" });
+    }
+
+    const activeFlock = await Flock.findOne({ owner: ownerId, status: 'active' });
+    if (activeFlock) {
+      const label = activeFlock.batch_no || 'the current batch';
+      return res.status(400).json({ error: `Close ${label} before creating a new batch.` });
     }
 
     // create base document (without batch_no)
@@ -91,13 +98,12 @@ router.patch('/:id', async (req, res) => {
 
     if (start_date !== undefined) {
       if (!start_date) return res.status(400).json({ error: 'start_date is required' });
-      const inputDate = new Date(start_date);
-      if (Number.isNaN(inputDate.getTime())) {
+      const inputDate = parseDateOnly(start_date);
+      if (!inputDate) {
         return res.status(400).json({ error: 'Invalid start_date' });
       }
       const today = new Date();
-      today.setHours(0,0,0,0);
-      inputDate.setHours(0,0,0,0);
+      today.setUTCHours(0,0,0,0);
       if (inputDate > today) return res.status(400).json({ error: 'start_date cannot be in the future' });
       flock.start_date = inputDate;
     }

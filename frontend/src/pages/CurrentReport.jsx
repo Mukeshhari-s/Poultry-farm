@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import useFlocks from "../hooks/useFlocks";
 import { reportApi } from "../services/api";
+import { formatIndiaDate } from "../utils/helpers";
 
 export default function CurrentReport() {
 	const { flocks } = useFlocks();
@@ -39,6 +40,13 @@ export default function CurrentReport() {
 
 	const summary = data?.summary;
 	const rows = data?.rows || [];
+
+	const renderDate = (row) => {
+		if (!row) return "";
+		if (row.date) return row.date;
+		if (row.dateIso) return formatIndiaDate(row.dateIso);
+		return "";
+	};
 	const medicineByDate = data?.medicineByDate || {};
 
 	return (
@@ -119,9 +127,12 @@ export default function CurrentReport() {
 									</td>
 								</tr>
 							)}
-							{rows.map((row) => (
-								<tr key={`${row.date}-${row.age}`}>
-									<td>{row.date}</td>
+							{rows.map((row) => {
+								const displayDate = renderDate(row);
+								const key = row._id || `${displayDate}-${row.age}`;
+								return (
+									<tr key={key}>
+										<td>{displayDate}</td>
 									<td>{row.age}</td>
 									<td>{row.mortality}</td>
 									<td>
@@ -131,8 +142,9 @@ export default function CurrentReport() {
 									<td>{row.feedPerBird}</td>
 									<td>{row.avgWeight ?? "-"}</td>
 									<td>{row.remarks || "-"}</td>
-								</tr>
-							))}
+									</tr>
+								);
+							})}
 						</tbody>
 					</table>
 				</div>

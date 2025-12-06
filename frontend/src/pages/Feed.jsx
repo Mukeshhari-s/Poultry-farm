@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import useFlocks from "../hooks/useFlocks";
 import { feedApi } from "../services/api";
-import { createBatchLabelMap } from "../utils/helpers";
+import { createBatchLabelMap, getTodayISO, formatIndiaDate } from "../utils/helpers";
 
-const today = new Date().toISOString().slice(0, 10);
+const today = getTodayISO();
 
 const calculateAvailableFeed = (logs, flockId) => {
 	return logs.reduce((acc, log) => {
@@ -213,7 +213,7 @@ export default function Feed() {
 		setEditFeedForm({
 			id: log._id,
 			entryType,
-			date: log.date?.slice(0, 10) || today,
+			date: formatIndiaDate(log.date) || today,
 			type: log.type || "",
 			bagsIn: log.bagsIn?.toString() || "",
 			bagsOut: log.bagsOut?.toString() || "",
@@ -547,7 +547,11 @@ export default function Feed() {
 								</tr>
 							)}
 							{feedLogs.map((log) => {
-								const batchLabel = batchLabelMap[log.flockId] || batchLabelMap[log.batch_no];
+								const batchLabel = log.batch_no
+									? batchLabelMap[log.batch_no] || log.batch_no
+									: log.flockId
+									? batchLabelMap[log.flockId] || log.flockId
+									: "-";
 								const numericPerBag = log.kgPerBag
 									? Number(log.kgPerBag)
 									: log.bagsIn
@@ -559,22 +563,22 @@ export default function Feed() {
 									? numericPerBag.toFixed(2)
 									: "-";
 								return (
-								<tr key={log._id}>
-									<td>{log.date?.slice(0, 10)}</td>
-									<td>{log.type}</td>
-									<td>{log.bagsIn || "-"}</td>
-									<td>{log.bagsOut || "-"}</td>
-									<td>{perBagDisplay}</td>
-									<td>{log.kgIn || "-"}</td>
-									<td>{log.kgOut || "-"}</td>
-									<td>{batchLabel || "-"}</td>
-									<td>
-										<button type="button" className="link" onClick={() => onEditFeed(log)}>
-											Edit
-										</button>
-									</td>
-								</tr>
-							);
+									<tr key={log._id}>
+										<td>{formatIndiaDate(log.date)}</td>
+										<td>{log.type}</td>
+										<td>{log.bagsIn || "-"}</td>
+										<td>{log.bagsOut || "-"}</td>
+										<td>{perBagDisplay}</td>
+										<td>{log.kgIn || "-"}</td>
+										<td>{log.kgOut || "-"}</td>
+										<td>{batchLabel || "-"}</td>
+										<td>
+											<button type="button" className="link" onClick={() => onEditFeed(log)}>
+												Edit
+											</button>
+										</td>
+									</tr>
+								);
 							})}
 						</tbody>
 					</table>

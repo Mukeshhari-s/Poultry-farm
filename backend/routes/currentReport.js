@@ -54,9 +54,13 @@ router.get('/', async (req, res) => {
       cumulativeFeedKg += feedKg;
       const cumulativeFeedPerBird = birdsAtStart > 0 ? (cumulativeFeedKg / Math.max(1, totalChicks - 0)) : 0; // cumulative per original chicks
 
+      const dateLabel = d.dateLabel || null;
+      const dateIso = d.date ? d.date.toISOString() : null;
+
       return {
         _id: d._id,
-        date: d.date ? d.date.toISOString().slice(0,10) : null,
+        date: dateLabel,
+        dateIso,
         age: d.age ?? null,
         mortality: mort,
         cumulativeMortality: cumulativeMort,

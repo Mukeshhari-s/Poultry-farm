@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import useFlocks from "../hooks/useFlocks";
 import { medicineApi } from "../services/api";
-import { createBatchLabelMap } from "../utils/helpers";
+import { createBatchLabelMap, getTodayISO, formatIndiaDate } from "../utils/helpers";
 
-const today = new Date().toISOString().slice(0, 10);
+const today = getTodayISO();
 
 export default function Medical() {
 	const { flocks } = useFlocks();
@@ -82,7 +82,7 @@ export default function Medical() {
 		setEditingRecord(rec);
 		setForm({
 			batch_no: rec.batch_no,
-			date: rec.date?.slice(0, 10) || today,
+			date: formatIndiaDate(rec.date) || today,
 			medicine_name: rec.medicine_name,
 			quantity: rec.quantity?.toString() || "",
 			dose: rec.dose || "",
@@ -182,7 +182,7 @@ export default function Medical() {
 							)}
 							{records.map((rec) => (
 								<tr key={rec._id}>
-									<td>{rec.date?.slice(0, 10)}</td>
+									<td>{formatIndiaDate(rec.date)}</td>
 									<td>{batchLabelMap[rec.batch_no] || rec.batch_no}</td>
 									<td>{rec.medicine_name}</td>
 									<td>{rec.quantity}</td>

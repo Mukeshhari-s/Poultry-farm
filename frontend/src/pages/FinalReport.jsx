@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import useFlocks from "../hooks/useFlocks";
 import { flockApi, reportApi } from "../services/api";
+import { formatIndiaDate } from "../utils/helpers";
 
 const MIN_CLOSING_AGE = 40;
 
@@ -177,17 +178,20 @@ export default function FinalReport() {
 									</td>
 								</tr>
 							)}
-							{rows.map((row, idx) => (
-								<tr key={`${row.date}-${idx}`}>
-									<td>{row.date?.slice(0, 10)}</td>
-									<td>{row.age}</td>
-									<td>{row.mortality}</td>
-									<td>{row.mortalityPercent?.toFixed?.(2) ?? row.mortalityPercent}</td>
-									<td>{row.feedKg}</td>
-									<td>{row.feedPerBird?.toFixed?.(4) ?? row.feedPerBird}</td>
-									<td>{row.birdsAtStart}</td>
-								</tr>
-							))}
+							{rows.map((row, idx) => {
+								const displayDate = formatIndiaDate(row.date || row.dateIso);
+								return (
+									<tr key={`${displayDate}-${idx}`}>
+										<td>{displayDate}</td>
+										<td>{row.age}</td>
+										<td>{row.mortality}</td>
+										<td>{row.mortalityPercent?.toFixed?.(2) ?? row.mortalityPercent}</td>
+										<td>{row.feedKg}</td>
+										<td>{row.feedPerBird?.toFixed?.(4) ?? row.feedPerBird}</td>
+										<td>{row.birdsAtStart}</td>
+									</tr>
+								);
+							})}
 						</tbody>
 					</table>
 				</div>
@@ -197,18 +201,21 @@ export default function FinalReport() {
 				<h2>Medicine summary</h2>
 				<div className="timeline">
 					{data?.medicineByDate &&
-						Object.entries(data.medicineByDate).map(([date, meds]) => (
-							<div key={date} className="timeline-item">
-								<div className="timeline-date">{date}</div>
-								<ul>
-									{meds.map((med) => (
-										<li key={med._id}>
-											{med.medicine_name} – {med.quantity} ({med.dose})
-										</li>
-									))}
-								</ul>
-							</div>
-						))}
+						Object.entries(data.medicineByDate).map(([date, meds]) => {
+							const displayDate = formatIndiaDate(date) || date;
+							return (
+								<div key={date} className="timeline-item">
+									<div className="timeline-date">{displayDate}</div>
+									<ul>
+										{meds.map((med) => (
+											<li key={med._id}>
+												{med.medicine_name} – {med.quantity} ({med.dose})
+											</li>
+										))}
+									</ul>
+								</div>
+							);
+						})}
 					{(!data || !data.medicineByDate || Object.keys(data.medicineByDate).length === 0) && (
 						<p>{loading ? "Loading..." : "No medicine entries"}</p>
 					)}

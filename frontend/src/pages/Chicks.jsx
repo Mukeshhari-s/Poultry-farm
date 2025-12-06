@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { flockApi } from "../services/api";
-import { decorateFlocksWithLabels } from "../utils/helpers";
+import { decorateFlocksWithLabels, getTodayISO, formatIndiaDate } from "../utils/helpers";
 
-const today = new Date().toISOString().slice(0, 10);
+const today = getTodayISO();
 
 export default function Chicks() {
   const [flocks, setFlocks] = useState([]);
@@ -14,6 +14,7 @@ export default function Chicks() {
   const [editingFlock, setEditingFlock] = useState(null);
 
   const batchesCount = useMemo(() => flocks.length, [flocks]);
+  const hasActiveBatch = useMemo(() => flocks.some((f) => f.status === "active"), [flocks]);
 
   const fetchFlocks = async () => {
     setLoading(true);
@@ -43,6 +44,11 @@ export default function Chicks() {
     e.preventDefault();
     setError("");
     setSuccess("");
+
+    if (!editingFlock && hasActiveBatch) {
+      setError("Close the active batch before creating a new one.");
+      return;
+    }
 
     if (!form.start_date || new Date(form.start_date) > new Date()) {
       setError("Date must be today or earlier.");
@@ -84,7 +90,7 @@ export default function Chicks() {
   const onEdit = (flock) => {
     setEditingFlock(flock);
     setForm({
-      start_date: flock.start_date ? flock.start_date.slice(0, 10) : today,
+      start_date: formatIndiaDate(flock.start_date) || today,
       totalChicks: flock.totalChicks?.toString() || "",
       remarks: flock.remarks || "",
     });
@@ -142,7 +148,7 @@ export default function Chicks() {
             />
           </label>
           <div className="grid-full" style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <button type="submit" disabled={submitting}>
+            <button type="submit" disabled={submitting || (!editingFlock && hasActiveBatch)}>
               {submitting ? "Saving..." : editingFlock ? "Update batch" : "Create batch"}
             </button>
             {editingFlock && (
@@ -152,6 +158,11 @@ export default function Chicks() {
             )}
           </div>
         </form>
+        {!editingFlock && hasActiveBatch && (
+          <div className="info mt">
+            You already have an active batch. Close it from the list below to add a new batch.
+          </div>
+        )}
         {error && <div className="error mt">{error}</div>}
         {success && <div className="success mt">{success}</div>}
       </div>
@@ -181,7 +192,7 @@ export default function Chicks() {
               {flocks.map((flock) => (
                 <tr key={flock._id}>
                   <td>{flock.displayLabel || flock.batch_no || "-"}</td>
-                  <td>{flock.start_date ? flock.start_date.slice(0, 10) : "-"}</td>
+                  <td>{formatIndiaDate(flock.start_date) || "-"}</td>
                   <td>{flock.totalChicks}</td>
                   <td>{flock.status}</td>
                   <td>{flock.remarks || "-"}</td>

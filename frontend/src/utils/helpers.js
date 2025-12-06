@@ -19,3 +19,20 @@ export function createBatchLabelMap(flocks = []) {
 	});
 	return map;
 }
+
+const INDIA_TZ = "Asia/Kolkata";
+const indiaDateFormatter = new Intl.DateTimeFormat("en-CA", { timeZone: INDIA_TZ });
+
+export function formatIndiaDate(value) {
+	if (!value && value !== 0) return "";
+	if (typeof value === "string" && value.length >= 10) {
+		return value.slice(0, 10);
+	}
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) return "";
+	return indiaDateFormatter.format(date);
+}
+
+export function getTodayISO() {
+	return formatIndiaDate(new Date());
+}

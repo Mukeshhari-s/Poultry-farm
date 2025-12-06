@@ -4,8 +4,10 @@ const router = express.Router();
 const DailyMonitoring = require("../models/DailyMonitoring");
 const Flock = require("../models/Flock");
 const Feed = require("../models/Feed");
+const { parseDateOnly, getDateLabel } = require("../utils/date");
 
 const FEED_EPSILON = 1e-6;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const getAvailableFeedForFlock = async (ownerId, flockId) => {
   if (!flockId) return 0;
@@ -33,6 +35,8 @@ router.post('/', async (req, res) => {
 
     if (!batch_no) return res.status(400).json({ error: "batch_no is required" });
     if (!date) return res.status(400).json({ error: "date is required" });
+    const dateLabel = getDateLabel(date);
+    if (!dateLabel) return res.status(400).json({ error: "Invalid date" });
 
     const mortalityValue = Number(mortality ?? 0);
     const feedBagsValue = Number(feedBags ?? 0);
@@ -50,25 +54,29 @@ router.post('/', async (req, res) => {
     if (batch.status !== 'active') return res.status(400).json({ error: "batch is not active" });
 
     // normalize dates
-    const inputDate = new Date(date); inputDate.setHours(0,0,0,0);
-    const today = new Date(); today.setHours(0,0,0,0);
-    if (Number.isNaN(inputDate.getTime())) return res.status(400).json({ error: "Invalid date" });
+    const inputDate = parseDateOnly(date);
+    if (!inputDate) return res.status(400).json({ error: "Invalid date" });
+    const today = new Date(); today.setUTCHours(0,0,0,0);
     if (inputDate > today) return res.status(400).json({ error: "date cannot be in the future" });
 
-    const startDate = new Date(batch.start_date); startDate.setHours(0,0,0,0);
+    const startDate = parseDateOnly(batch.start_date);
+    if (!startDate) return res.status(400).json({ error: "Batch start_date invalid" });
     if (inputDate < startDate) return res.status(400).json({ error: "date cannot be before batch start_date" });
 
-    // compute age automatically for this owner's batch
-    const lastRec = await DailyMonitoring.findOne({ batch_no, owner: ownerId }).sort({ date: -1 });
-    let computedAge;
-    if (lastRec) {
-      const prevDate = new Date(lastRec.date); prevDate.setHours(0,0,0,0);
-      const gap = Math.round((inputDate - prevDate) / (24 * 60 * 60 * 1000));
-      if (gap < 0) return res.status(400).json({ error: "date cannot be earlier than last recorded date" });
-      computedAge = lastRec.age + gap;
-    } else {
-      computedAge = Math.round((inputDate - startDate) / (24 * 60 * 60 * 1000));
+    const nextDate = new Date(inputDate.getTime() + MS_PER_DAY);
+    const existingEntry = await DailyMonitoring.findOne({
+      owner: ownerId,
+      batch_no,
+      $or: [
+        { dateLabel },
+        { date: { $gte: inputDate, $lt: nextDate } }
+      ]
+    });
+    if (existingEntry) {
+      return res.status(400).json({ error: "Daily entry already exists for this date. Edit the existing record instead." });
     }
+
+    const computedAge = Math.round((inputDate - startDate) / MS_PER_DAY);
 
     if (computedAge < 0 || computedAge > 55) {
       return res.status(400).json({ error: `computed age ${computedAge} out of range (0-55)` });
@@ -90,6 +98,7 @@ router.post('/', async (req, res) => {
       owner: ownerId,
       batch_no,
       date: inputDate,
+      dateLabel,
       age: computedAge,
       mortality: mortalityValue,
       feedBags: feedBagsValue,
@@ -137,6 +146,9 @@ router.patch('/:id', async (req, res) => {
 
     const rec = await DailyMonitoring.findOne({ _id: id, owner: ownerId });
     if (!rec) return res.status(404).json({ error: 'Daily record not found' });
+    if (!rec.dateLabel && rec.date) {
+      rec.dateLabel = getDateLabel(rec.date);
+    }
 
     const originalSnapshot = {
       mortality: rec.mortality,

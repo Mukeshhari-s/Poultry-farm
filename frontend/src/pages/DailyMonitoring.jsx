@@ -1,8 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 import useFlocks from "../hooks/useFlocks";
 import { monitoringApi, reportApi } from "../services/api";
+import { getTodayISO, formatIndiaDate } from "../utils/helpers";
 
-const today = new Date().toISOString().slice(0, 10);
+const today = getTodayISO();
+
+const getRowDate = (row) => {
+	if (!row) return "";
+	if (row.date) return row.date;
+	if (row.dateIso) return formatIndiaDate(row.dateIso);
+	return "";
+};
 
 const computeFeedKg = (bags, kgPerBag) => {
 	const total = Number(bags || 0) * Number(kgPerBag || 0);
@@ -39,11 +47,31 @@ export default function DailyMonitoring() {
 	const [reportSummary, setReportSummary] = useState(null);
 	const [reportLoading, setReportLoading] = useState(false);
 
+	const selectedFlock = useMemo(
+		() => flocks.find((f) => f.batch_no === selectedBatch),
+		[flocks, selectedBatch]
+	);
+	const batchStartDate = useMemo(() => {
+		if (!selectedFlock?.start_date) return "";
+		return formatIndiaDate(selectedFlock.start_date);
+	}, [selectedFlock]);
+
 	useEffect(() => {
 		if (!selectedBatch && flocks.length > 0) {
 			setSelectedBatch(flocks[0].batch_no);
 		}
 	}, [flocks, selectedBatch]);
+
+	useEffect(() => {
+		setForm((prev) => {
+			const minDate = batchStartDate || "";
+			let nextDate = prev.date || today;
+			if (minDate && nextDate < minDate) nextDate = minDate;
+			if (nextDate > today) nextDate = today;
+			if (nextDate === prev.date) return prev;
+			return { ...prev, date: nextDate };
+		});
+	}, [batchStartDate]);
 
 	const onChange = (e) => {
 		const { name, value } = e.target;
@@ -74,12 +102,37 @@ export default function DailyMonitoring() {
 		setEditForm(emptyEditForm);
 	}, [selectedBatch]);
 
+	const hasEntryForSelectedDate = useMemo(() => {
+		if (!form.date) return false;
+		return reportRows.some((row) => getRowDate(row) === form.date);
+	}, [reportRows, form.date]);
+
+	const dateOutOfRange = useMemo(() => {
+		if (!form.date) return false;
+		if (batchStartDate && form.date < batchStartDate) return true;
+		if (form.date > today) return true;
+		return false;
+	}, [batchStartDate, form.date]);
+
 	const onSubmit = async (e) => {
 		e.preventDefault();
 		setError("");
 		setSuccess("");
 		if (!selectedBatch) {
 			setError("Select a batch first");
+			return;
+		}
+		if (!form.date) {
+			setError("Pick a date for the entry.");
+			return;
+		}
+		if (dateOutOfRange) {
+			const from = batchStartDate || "the chick-in date";
+			setError(`Date must be between ${from} and ${today}.`);
+			return;
+		}
+		if (hasEntryForSelectedDate) {
+			setError("An entry for this date already exists. Use the edit option instead.");
 			return;
 		}
 		setSaving(true);
@@ -190,7 +243,19 @@ export default function DailyMonitoring() {
 				<form className="grid-3" onSubmit={onSubmit}>
 					<label>
 						<span>Date</span>
-						<input type="date" name="date" max={today} value={form.date} onChange={onChange} />
+						<input
+							type="date"
+							name="date"
+							min={batchStartDate || undefined}
+							max={today}
+							value={form.date}
+							onChange={onChange}
+						/>
+						{batchStartDate && (
+							<small style={{ display: "block", marginTop: "0.35rem", color: "#555" }}>
+								Allowed range: {batchStartDate} – {today}
+							</small>
+						)}
 					</label>
 					<label>
 						<span>Mortality</span>
@@ -213,18 +278,24 @@ export default function DailyMonitoring() {
 						<textarea name="remarks" rows={2} value={form.remarks} onChange={onChange} />
 					</label>
 					<div className="grid-full">
-						<button type="submit" disabled={saving}>
+						<button type="submit" disabled={saving || dateOutOfRange || hasEntryForSelectedDate}>
 							{saving ? "Saving..." : "Save entry"}
 						</button>
 					</div>
 				</form>
+				{hasEntryForSelectedDate && (
+					<div className="info mt">Entry already logged for this date. Use edit below to make changes.</div>
+				)}
+				{dateOutOfRange && (
+					<div className="error mt">Date must be between the batch start date and today.</div>
+				)}
 			</div>
 
 			{editingRow && (
 				<div className="card mt">
 					<div className="card-header">
 						<h2>Edit daily record</h2>
-						<div className="stat-pill">{editingRow.date}</div>
+						<div className="stat-pill">{getRowDate(editingRow)}</div>
 					</div>
 					<form className="grid-3" onSubmit={onEditSubmit}>
 						<label>
@@ -289,25 +360,29 @@ export default function DailyMonitoring() {
 									</td>
 								</tr>
 							)}
-							{reportRows.map((row) => (
-								<tr key={row._id || `${row.date}-${row.age}`}>
-									<td>{row.date}</td>
-									<td>{row.age}</td>
-									<td>{row.mortality}</td>
-									<td>
-										{row.cumulativeMortality} ({row.mortalityPercent}% )
-									</td>
-									<td>{row.feedKg}</td>
-									<td>{row.feedPerBird}</td>
-									<td>{row.avgWeight ?? "-"}</td>
-									<td>{row.remarks || "-"}</td>
-									<td>
-										<button type="button" className="link" onClick={() => startEdit(row)}>
-											Edit
-										</button>
-									</td>
-								</tr>
-							))}
+							{reportRows.map((row) => {
+								const displayDate = getRowDate(row) || row.date || "";
+								const key = row._id || `${displayDate}-${row.age}`;
+								return (
+									<tr key={key}>
+										<td>{displayDate}</td>
+										<td>{row.age}</td>
+										<td>{row.mortality}</td>
+										<td>
+											{row.cumulativeMortality} ({row.mortalityPercent}% )
+										</td>
+										<td>{row.feedKg}</td>
+										<td>{row.feedPerBird}</td>
+										<td>{row.avgWeight ?? "-"}</td>
+										<td>{row.remarks || "-"}</td>
+										<td>
+											<button type="button" className="link" onClick={() => startEdit(row)}>
+												Edit
+											</button>
+										</td>
+									</tr>
+								);
+							})}
 						</tbody>
 					</table>
 				</div>

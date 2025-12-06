@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import useFlocks from "../hooks/useFlocks";
 import { salesApi } from "../services/api";
+import { getTodayISO, formatIndiaDate } from "../utils/helpers";
 
-const today = new Date().toISOString().slice(0, 10);
+const today = getTodayISO();
 
 const emptySaleForm = () => ({
 	date: today,
@@ -94,7 +95,7 @@ export default function Sales() {
 	const startEdit = (sale) => {
 		setEditingSale(sale);
 		setEditForm({
-			date: sale.date?.slice(0, 10) || today,
+			date: formatIndiaDate(sale.date) || today,
 			vehicle_no: sale.vehicle_no || "",
 			cages: sale.cages?.toString() || "0",
 			birds: sale.birds?.toString() || "0",
@@ -225,7 +226,7 @@ export default function Sales() {
 				<div className="card mt">
 					<div className="card-header">
 						<h2>Edit sale record</h2>
-						<div className="stat-pill">{editingSale.date?.slice(0, 10) || "--"}</div>
+						<div className="stat-pill">{formatIndiaDate(editingSale?.date) || "--"}</div>
 					</div>
 					<form className="grid-3" onSubmit={onEditSubmit}>
 						<label>
@@ -289,7 +290,7 @@ export default function Sales() {
 							)}
 							{records.map((sale) => (
 								<tr key={sale._id}>
-									<td>{sale.date?.slice(0, 10)}</td>
+									<td>{formatIndiaDate(sale.date)}</td>
 									<td>{sale.vehicle_no || "-"}</td>
 									<td>{sale.cages}</td>
 									<td>{sale.birds}</td>

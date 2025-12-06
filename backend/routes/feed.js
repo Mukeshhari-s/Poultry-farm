@@ -8,8 +8,8 @@ function isFutureDate(d) {
   const today = new Date();
 
   // Reset today's time to midnight (so time won't affect comparison)
-  today.setHours(0, 0, 0, 0);
-  input.setHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
+  input.setUTCHours(0, 0, 0, 0);
 
   return input > today;
 }
@@ -72,11 +72,15 @@ router.post('/in', async (req, res) => {
       if (!flockDoc) return res.status(404).json({ error: 'Batch not found' });
     }
 
+    const entryDate = date ? new Date(date) : new Date();
+    if (Number.isNaN(entryDate.getTime())) return res.status(400).json({ error: 'Invalid date' });
+    entryDate.setUTCHours(0, 0, 0, 0);
+
     const feed = new Feed({
       owner: ownerId,
       type: normalizedType,
       typeKey,
-      date: date ? new Date(date) : new Date(),
+      date: entryDate,
       bagsIn: bagsValue,
       kgPerBag: kgPerBagValue,
       kgIn,
@@ -127,11 +131,15 @@ router.post('/out', async (req, res) => {
       return res.status(400).json({ error: `Only ${formatted} kg available for ${normalizedType}${flockDoc ? ` in ${flockDoc.batch_no}` : ''}` });
     }
 
+    const entryDate = date ? new Date(date) : new Date();
+    if (Number.isNaN(entryDate.getTime())) return res.status(400).json({ error: 'Invalid date' });
+    entryDate.setUTCHours(0, 0, 0, 0);
+
     const feed = new Feed({
       owner: ownerId,
       type: normalizedType,
       typeKey,
-      date: date ? new Date(date) : new Date(),
+      date: entryDate,
       bagsOut: bagsValue,
       kgPerBag: kgPerBagValue,
       kgOut: kgOutValue,
@@ -185,6 +193,7 @@ router.patch('/:id', async (req, res) => {
       if (isFutureDate(date)) return res.status(400).json({ error: 'date cannot be in the future' });
       const parsedDate = new Date(date);
       if (Number.isNaN(parsedDate.getTime())) return res.status(400).json({ error: 'Invalid date' });
+      parsedDate.setUTCHours(0, 0, 0, 0);
       feed.date = parsedDate;
     }
 
