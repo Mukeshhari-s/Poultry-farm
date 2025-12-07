@@ -70,11 +70,15 @@ export default function Dashboard() {
           </strong>
         </div>
         <div className="stat-card">
-          <span>Feed remaining (kg)</span>
+          <span>Feed remaining (bags)</span>
           <strong>
-            {summary?.feedRemaining ?? "-"}
-            {summary?.feedRemaining ? (
-              <span className="stat-subtext"> ({(summary.feedRemaining / 60).toFixed(2)} bags)</span>
+            {summary?.feedRemaining
+              ? formatBagsFromKg(summary.feedRemaining)
+              : summary?.feedRemaining === 0
+              ? "0.00"
+              : "-"}
+            {summary?.feedRemaining != null ? (
+              <span className="stat-subtext"> ({Number(summary.feedRemaining).toFixed(2)} kg)</span>
             ) : null}
           </strong>
         </div>
@@ -97,11 +101,13 @@ export default function Dashboard() {
               <strong>{latestRow.mortality}</strong>
             </div>
             <div className="stat-card">
-              <span>Feed kg</span>
+              <span>Feed bags</span>
               <strong>
-                {hasValue(latestRow.feedKg) ? Number(latestRow.feedKg).toFixed(2) : "-"}
+                {hasValue(latestRow.feedKg)
+                  ? formatBagsFromKg(latestRow.feedKg)
+                  : "-"}
                 {hasValue(latestRow.feedKg) ? (
-                  <span className="stat-subtext"> ({formatBagsFromKg(latestRow.feedKg)} bags)</span>
+                  <span className="stat-subtext"> ({Number(latestRow.feedKg).toFixed(2)} kg)</span>
                 ) : null}
               </strong>
             </div>

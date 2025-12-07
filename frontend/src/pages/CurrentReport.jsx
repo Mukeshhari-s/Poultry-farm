@@ -119,29 +119,35 @@ export default function CurrentReport() {
 						</strong>
 					</div>
 					<div className="stat-card">
-						<span>Feed out (kg)</span>
+						<span>Feed out (bags)</span>
 						<strong>
-							{formatStatValue(summary.totalFeedOut)}
+							{hasValue(summary.totalFeedOut)
+								? formatStatValue(formatBagsFromKg(summary.totalFeedOut))
+								: "-"}
 							{hasValue(summary.totalFeedOut) ? (
-								<span className="stat-subtext"> ({formatBagsFromKg(summary.totalFeedOut)} bags)</span>
+								<span className="stat-subtext"> ({formatStatValue(summary.totalFeedOut)} kg)</span>
 							) : null}
 						</strong>
 					</div>
 					<div className="stat-card">
-						<span>Feed used (kg)</span>
+						<span>Feed used (bags)</span>
 						<strong>
-							{formatStatValue(summary.totalFeedUsed)}
+							{hasValue(summary.totalFeedUsed)
+								? formatStatValue(formatBagsFromKg(summary.totalFeedUsed))
+								: "-"}
 							{hasValue(summary.totalFeedUsed) ? (
-								<span className="stat-subtext"> ({formatBagsFromKg(summary.totalFeedUsed)} bags)</span>
+								<span className="stat-subtext"> ({formatStatValue(summary.totalFeedUsed)} kg)</span>
 							) : null}
 						</strong>
 					</div>
 					<div className="stat-card">
-						<span>Feed remaining (kg)</span>
+						<span>Feed remaining (bags)</span>
 						<strong>
-							{formatStatValue(summary.feedRemaining)}
+							{hasValue(summary.feedRemaining)
+								? formatStatValue(formatBagsFromKg(summary.feedRemaining))
+								: "-"}
 							{hasValue(summary.feedRemaining) ? (
-								<span className="stat-subtext"> ({formatBagsFromKg(summary.feedRemaining)} bags)</span>
+								<span className="stat-subtext"> ({formatStatValue(summary.feedRemaining)} kg)</span>
 							) : null}
 						</strong>
 					</div>

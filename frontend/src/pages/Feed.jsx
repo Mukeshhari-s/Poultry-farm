@@ -741,8 +741,8 @@ export default function Feed() {
 								<th>Bags out</th>
 								<th>Kg in</th>
 								<th>Kg out</th>
-								<th>Bags in (kg/60)</th>
-								<th>Bags out (kg/60)</th>
+								<th>Bags in</th>
+								<th>Bags out</th>
 								<th>Unit price</th>
 								<th>Total cost</th>
 								<th>Batch</th>
