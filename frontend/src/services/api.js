@@ -1,6 +1,7 @@
 import axios from "axios";
 
-const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace(/\/$/, "");
+const FALLBACK_API = "https://poultry-farm-v0k0.onrender.com/api";
+const API_BASE = (import.meta.env.VITE_API_URL || FALLBACK_API).replace(/\/$/, "");
 
 const api = axios.create({
 	baseURL: API_BASE,
