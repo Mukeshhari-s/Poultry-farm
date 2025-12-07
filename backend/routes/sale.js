@@ -7,6 +7,10 @@ const DailyMonitoring = require('../models/DailyMonitoring');
 // helper: strip time
 function strip(d){ const x=new Date(d); x.setHours(0,0,0,0); return x; }
 
+function roundWeight(value) {
+  return Math.round(value * 1000) / 1000;
+}
+
 // compute remaining birds for a batch
 async function getRemainingBirds(batch_no, ownerId) {
   const batch = await Flock.findOne({ batch_no, owner: ownerId });
@@ -34,13 +38,14 @@ async function getRemainingBirds(batch_no, ownerId) {
 router.post('/', async (req, res) => {
   try {
     const ownerId = req.user._id;
-    const { batch_no, date, vehicle_no = '', cages, birds, total_weight, remarks } = req.body;
+    const { batch_no, date, vehicle_no = '', cages, birds, remarks, empty_weight, load_weight } = req.body;
 
     if (!batch_no) return res.status(400).json({ error: 'batch_no is required' });
     if (!date) return res.status(400).json({ error: 'date is required' });
     if (cages == null) return res.status(400).json({ error: 'cages is required' });
     if (birds == null) return res.status(400).json({ error: 'birds is required' });
-    if (total_weight == null) return res.status(400).json({ error: 'total_weight is required' });
+    if (empty_weight == null) return res.status(400).json({ error: 'empty_weight is required' });
+    if (load_weight == null) return res.status(400).json({ error: 'load_weight is required' });
 
     const inputDate = strip(date);
     const today = strip(new Date());
@@ -57,7 +62,12 @@ router.post('/', async (req, res) => {
     // numeric validations
     if (!Number.isFinite(cages) || cages < 0) return res.status(400).json({ error: 'cages must be >= 0' });
     if (!Number.isFinite(birds) || birds <= 0) return res.status(400).json({ error: 'birds must be > 0' });
-    if (!Number.isFinite(total_weight) || total_weight <= 0) return res.status(400).json({ error: 'total_weight must be > 0' });
+    const emptyWeightValue = Number(empty_weight);
+    const loadWeightValue = Number(load_weight);
+    if (!Number.isFinite(emptyWeightValue) || emptyWeightValue < 0) return res.status(400).json({ error: 'empty_weight must be >= 0' });
+    if (!Number.isFinite(loadWeightValue) || loadWeightValue <= 0) return res.status(400).json({ error: 'load_weight must be > 0' });
+    const computedTotal = roundWeight(loadWeightValue - emptyWeightValue);
+    if (computedTotal <= 0) return res.status(400).json({ error: 'load_weight must be greater than empty_weight' });
 
     // compute remaining
     const { remaining } = await getRemainingBirds(batch_no, ownerId);
@@ -68,7 +78,15 @@ router.post('/', async (req, res) => {
     // create sale record
     const sale = new Sale({
       owner: ownerId,
-      batch_no, date: inputDate, vehicle_no, cages, birds, total_weight, remarks
+      batch_no,
+      date: inputDate,
+      vehicle_no,
+      cages,
+      birds,
+      empty_weight: emptyWeightValue,
+      load_weight: loadWeightValue,
+      total_weight: computedTotal,
+      remarks
     });
     const saved = await sale.save();
 
@@ -111,7 +129,7 @@ router.patch('/:id', async (req, res) => {
   try {
     const ownerId = req.user._id;
     const { id } = req.params;
-    const { date, vehicle_no, cages, birds, total_weight, remarks } = req.body || {};
+    const { date, vehicle_no, cages, birds, total_weight, remarks, empty_weight, load_weight } = req.body || {};
 
     const sale = await Sale.findOne({ _id: id, owner: ownerId });
     if (!sale) return res.status(404).json({ error: 'Sale entry not found' });
@@ -136,12 +154,6 @@ router.patch('/:id', async (req, res) => {
       sale.cages = value;
     }
 
-    if (total_weight !== undefined) {
-      const value = Number(total_weight);
-      if (!Number.isFinite(value) || value <= 0) return res.status(400).json({ error: 'total_weight must be > 0' });
-      sale.total_weight = value;
-    }
-
     if (birds !== undefined) {
       const value = Number(birds);
       if (!Number.isFinite(value) || value <= 0) return res.status(400).json({ error: 'birds must be > 0' });
@@ -151,6 +163,36 @@ router.patch('/:id', async (req, res) => {
         return res.status(400).json({ error: `not enough birds. Remaining: ${available}` });
       }
       sale.birds = value;
+    }
+
+    let nextEmptyWeight = typeof sale.empty_weight === 'number' ? sale.empty_weight : 0;
+    let nextLoadWeight = typeof sale.load_weight === 'number' ? sale.load_weight : 0;
+    let shouldRecomputeTotal = false;
+
+    if (empty_weight !== undefined) {
+      const value = Number(empty_weight);
+      if (!Number.isFinite(value) || value < 0) return res.status(400).json({ error: 'empty_weight must be >= 0' });
+      sale.empty_weight = value;
+      nextEmptyWeight = value;
+      shouldRecomputeTotal = true;
+    }
+
+    if (load_weight !== undefined) {
+      const value = Number(load_weight);
+      if (!Number.isFinite(value) || value <= 0) return res.status(400).json({ error: 'load_weight must be > 0' });
+      sale.load_weight = value;
+      nextLoadWeight = value;
+      shouldRecomputeTotal = true;
+    }
+
+    if (shouldRecomputeTotal) {
+      const computedTotal = roundWeight(nextLoadWeight - nextEmptyWeight);
+      if (computedTotal <= 0) return res.status(400).json({ error: 'load_weight must be greater than empty_weight' });
+      sale.total_weight = computedTotal;
+    } else if (total_weight !== undefined) {
+      const value = Number(total_weight);
+      if (!Number.isFinite(value) || value <= 0) return res.status(400).json({ error: 'total_weight must be > 0' });
+      sale.total_weight = value;
     }
 
     const saved = await sale.save();

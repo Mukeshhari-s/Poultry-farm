@@ -25,6 +25,16 @@ const MedicineSchema = new mongoose.Schema({
   dose: {
     type: String,
     required: true
+  },
+
+  unitPrice: {
+    type: Number,
+    default: 0
+  },
+
+  totalCost: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: true       // adds createdAt + updatedAt

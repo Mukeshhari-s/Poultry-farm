@@ -31,7 +31,49 @@ function getDateLabel(value) {
   return date.toISOString().slice(0, 10);
 }
 
+function addDays(date, days = 1) {
+  if (!date) return null;
+  const cloned = new Date(date.getTime());
+  cloned.setUTCDate(cloned.getUTCDate() + days);
+  return cloned;
+}
+
+function computeNextRequiredDate(startDate, records = []) {
+  const start = parseDateOnly(startDate);
+  if (!start) return null;
+
+  const sorted = Array.isArray(records)
+    ? [...records].sort((a, b) => {
+        const aDate = parseDateOnly(a?.dateLabel || a?.date);
+        const bDate = parseDateOnly(b?.dateLabel || b?.date);
+        if (!aDate && !bDate) return 0;
+        if (!aDate) return 1;
+        if (!bDate) return -1;
+        return aDate.getTime() - bDate.getTime();
+      })
+    : [];
+
+  let expected = start;
+  for (const rec of sorted) {
+    const recDate = parseDateOnly(rec?.dateLabel || rec?.date);
+    if (!recDate) continue;
+    const recTime = recDate.getTime();
+    const expectedTime = expected.getTime();
+    if (recTime < expectedTime) continue;
+    if (recTime === expectedTime) {
+      expected = addDays(expected, 1);
+      continue;
+    }
+    if (recTime > expectedTime) {
+      return expected;
+    }
+  }
+  return expected;
+}
+
 module.exports = {
   parseDateOnly,
   getDateLabel,
+  addDays,
+  computeNextRequiredDate,
 };

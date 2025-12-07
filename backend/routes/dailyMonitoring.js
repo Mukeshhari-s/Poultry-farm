@@ -4,7 +4,7 @@ const router = express.Router();
 const DailyMonitoring = require("../models/DailyMonitoring");
 const Flock = require("../models/Flock");
 const Feed = require("../models/Feed");
-const { parseDateOnly, getDateLabel } = require("../utils/date");
+const { parseDateOnly, getDateLabel, computeNextRequiredDate } = require("../utils/date");
 
 const FEED_EPSILON = 1e-6;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -56,24 +56,31 @@ router.post('/', async (req, res) => {
     // normalize dates
     const inputDate = parseDateOnly(date);
     if (!inputDate) return res.status(400).json({ error: "Invalid date" });
-    const today = new Date(); today.setUTCHours(0,0,0,0);
+    const today = parseDateOnly(new Date());
     if (inputDate > today) return res.status(400).json({ error: "date cannot be in the future" });
 
     const startDate = parseDateOnly(batch.start_date);
     if (!startDate) return res.status(400).json({ error: "Batch start_date invalid" });
     if (inputDate < startDate) return res.status(400).json({ error: "date cannot be before batch start_date" });
 
-    const nextDate = new Date(inputDate.getTime() + MS_PER_DAY);
-    const existingEntry = await DailyMonitoring.findOne({
-      owner: ownerId,
-      batch_no,
-      $or: [
-        { dateLabel },
-        { date: { $gte: inputDate, $lt: nextDate } }
-      ]
-    });
-    if (existingEntry) {
-      return res.status(400).json({ error: "Daily entry already exists for this date. Edit the existing record instead." });
+    const existingRecords = await DailyMonitoring.find({ owner: ownerId, batch_no })
+      .sort({ date: 1 })
+      .select('date dateLabel')
+      .lean();
+    const nextRequiredDate = computeNextRequiredDate(startDate, existingRecords);
+    if (!nextRequiredDate) {
+      return res.status(400).json({ error: "Unable to determine next required date for this batch" });
+    }
+
+    if (nextRequiredDate.getTime() > today.getTime()) {
+      return res.status(400).json({ error: "Daily entries are already recorded through today. Come back tomorrow." });
+    }
+
+    if (inputDate.getTime() !== nextRequiredDate.getTime()) {
+      return res.status(400).json({
+        error: `Next required date is ${getDateLabel(nextRequiredDate)}. Please record entries sequentially.`,
+        nextRequiredDate: getDateLabel(nextRequiredDate),
+      });
     }
 
     const computedAge = Math.round((inputDate - startDate) / MS_PER_DAY);

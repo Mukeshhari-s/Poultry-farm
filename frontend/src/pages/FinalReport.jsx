@@ -77,12 +77,18 @@ export default function FinalReport() {
 
 	const summaryCards = [
 		{ label: "Total chicks in", value: data?.totalChicks ?? "-" },
+		{ label: "Price per chick", value: data?.pricePerChick ?? "-" },
+		{ label: "Total chick cost", value: data?.totalChickCost ?? "-" },
 		{ label: "Remaining chicks", value: data?.remainingChicks ?? "-" },
 		{ label: "Total feed in (kg)", value: data?.totalFeedIn ?? "-" },
 		{ label: "Feed used (kg)", value: data?.totalFeedOut ?? "-" },
 		{ label: "Feed remaining (kg)", value: data?.feedRemaining ?? "-" },
+		{ label: "Feed cost in", value: data?.totalFeedCostIn ?? "-" },
+		{ label: "Feed cost out", value: data?.totalFeedCostOut ?? "-" },
+		{ label: "Feed cost remaining", value: data?.feedCostRemaining ?? "-" },
 		{ label: "Birds sold", value: data?.totalBirdsSold ?? "-" },
 		{ label: "Weight sold (kg)", value: data?.totalWeightSold ?? "-" },
+		{ label: "Total medicine cost", value: data?.totalMedicineCost ?? "-" },
 	];
 
 	return (
@@ -208,9 +214,12 @@ export default function FinalReport() {
 									<div className="timeline-date">{displayDate}</div>
 									<ul>
 										{meds.map((med) => (
-											<li key={med._id}>
-												{med.medicine_name} – {med.quantity} ({med.dose})
-											</li>
+												<li key={med._id}>
+													{med.medicine_name} – {med.quantity}
+													{med.dose ? ` (${med.dose})` : ""}
+													{med.unitPrice ? ` @ ${Number(med.unitPrice).toFixed(2)} ea` : ""}
+													{med.totalCost ? ` · total ${Number(med.totalCost).toFixed(2)}` : ""}
+												</li>
 										))}
 									</ul>
 								</div>

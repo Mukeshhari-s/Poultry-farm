@@ -19,11 +19,12 @@ function ymd(d) {
 router.post('/', async (req, res) => {
   try {
     const ownerId = req.user._id;
-    const { start_date, totalChicks, remarks } = req.body;
+    const { start_date, totalChicks, remarks, pricePerChick } = req.body;
 
     // basic presence check
     if (!start_date) return res.status(400).json({ error: "start_date is required" });
     if (totalChicks == null) return res.status(400).json({ error: "totalChicks is required" });
+    if (pricePerChick == null) return res.status(400).json({ error: "pricePerChick is required" });
 
     const inputDate = parseDateOnly(start_date);
     if (!inputDate) return res.status(400).json({ error: "Invalid start_date" });
@@ -41,6 +42,11 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: "totalChicks must be a number > 0" });
     }
 
+    const priceValue = Number(pricePerChick);
+    if (!Number.isFinite(priceValue) || priceValue <= 0) {
+      return res.status(400).json({ error: "pricePerChick must be a number > 0" });
+    }
+
     const activeFlock = await Flock.findOne({ owner: ownerId, status: 'active' });
     if (activeFlock) {
       const label = activeFlock.batch_no || 'the current batch';
@@ -52,6 +58,7 @@ router.post('/', async (req, res) => {
       owner: ownerId,
       start_date: inputDate,
       totalChicks,
+      pricePerChick: priceValue,
       remarks
     });
 
@@ -91,7 +98,7 @@ router.get('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { start_date, totalChicks, remarks } = req.body || {};
+    const { start_date, totalChicks, remarks, pricePerChick } = req.body || {};
 
     const flock = await Flock.findOne({ _id: id, owner: req.user._id });
     if (!flock) return res.status(404).json({ error: 'Flock not found' });
@@ -118,6 +125,14 @@ router.patch('/:id', async (req, res) => {
 
     if (remarks !== undefined) {
       flock.remarks = remarks;
+    }
+
+    if (pricePerChick !== undefined) {
+      const priceValue = Number(pricePerChick);
+      if (!Number.isFinite(priceValue) || priceValue <= 0) {
+        return res.status(400).json({ error: 'pricePerChick must be a number > 0' });
+      }
+      flock.pricePerChick = priceValue;
     }
 
     const saved = await flock.save();

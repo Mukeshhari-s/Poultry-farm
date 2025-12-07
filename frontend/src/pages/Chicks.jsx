@@ -6,7 +6,7 @@ const today = getTodayISO();
 
 export default function Chicks() {
   const [flocks, setFlocks] = useState([]);
-  const [form, setForm] = useState({ start_date: today, totalChicks: "", remarks: "" });
+  const [form, setForm] = useState({ start_date: today, totalChicks: "", pricePerChick: "", remarks: "" });
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -54,17 +54,22 @@ export default function Chicks() {
       setError("Date must be today or earlier.");
       return;
     }
-    if (!form.totalChicks || Number(form.totalChicks) <= 0) {
+        if (!form.totalChicks || Number(form.totalChicks) <= 0) {
       setError("Total chicks must be greater than zero.");
       return;
     }
+        if (!form.pricePerChick || Number(form.pricePerChick) <= 0) {
+          setError("Price per chick must be greater than zero.");
+          return;
+        }
 
     setSubmitting(true);
     try {
       const payload = {
         start_date: form.start_date,
         totalChicks: Number(form.totalChicks),
-        remarks: form.remarks || "",
+            pricePerChick: Number(form.pricePerChick),
+            remarks: form.remarks || "",
       };
 
       if (editingFlock) {
@@ -79,7 +84,7 @@ export default function Chicks() {
         setSuccess(`${latestLabel} created.`);
       }
 
-      setForm({ start_date: today, totalChicks: "", remarks: "" });
+      setForm({ start_date: today, totalChicks: "", pricePerChick: "", remarks: "" });
     } catch (err) {
       setError(err.response?.data?.error || err.message || "Unable to save batch");
     } finally {
@@ -92,6 +97,7 @@ export default function Chicks() {
     setForm({
       start_date: formatIndiaDate(flock.start_date) || today,
       totalChicks: flock.totalChicks?.toString() || "",
+      pricePerChick: flock.pricePerChick?.toString() || "",
       remarks: flock.remarks || "",
     });
     setSuccess("");
@@ -100,7 +106,7 @@ export default function Chicks() {
 
   const cancelEdit = () => {
     setEditingFlock(null);
-    setForm({ start_date: today, totalChicks: "", remarks: "" });
+    setForm({ start_date: today, totalChicks: "", pricePerChick: "", remarks: "" });
   };
 
   return (
@@ -135,6 +141,17 @@ export default function Chicks() {
               name="totalChicks"
               min="1"
               value={form.totalChicks}
+              onChange={onChange}
+            />
+          </label>
+          <label>
+            <span>Price per chick</span>
+            <input
+              type="number"
+              name="pricePerChick"
+              min="0"
+              step="0.01"
+              value={form.pricePerChick}
               onChange={onChange}
             />
           </label>
@@ -176,6 +193,7 @@ export default function Chicks() {
                 <th>Batch no</th>
                 <th>Start date</th>
                 <th>Total chicks</th>
+                <th>Price/chick</th>
                 <th>Status</th>
                 <th>Remarks</th>
                 <th style={{ width: "90px" }}>Actions</th>
@@ -194,6 +212,7 @@ export default function Chicks() {
                   <td>{flock.displayLabel || flock.batch_no || "-"}</td>
                   <td>{formatIndiaDate(flock.start_date) || "-"}</td>
                   <td>{flock.totalChicks}</td>
+                  <td>{flock.pricePerChick ? flock.pricePerChick.toFixed?.(2) ?? flock.pricePerChick : "-"}</td>
                   <td>{flock.status}</td>
                   <td>{flock.remarks || "-"}</td>
                   <td>

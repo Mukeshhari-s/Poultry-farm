@@ -11,6 +11,8 @@ const FeedSchema = new mongoose.Schema({
   kgPerBag: { type: Number, default: 0 },
   kgIn: { type: Number, default: 0 },
   kgOut: { type: Number, default: 0 },
+  unitPrice: { type: Number, default: 0 },
+  totalCost: { type: Number, default: 0 },
   dailyRecord: { type: mongoose.Schema.Types.ObjectId, ref: 'DailyMonitoring', index: true },
   flockId: { type: mongoose.Schema.Types.ObjectId, ref: 'Flock' },
   batch_no: { type: String, index: true }

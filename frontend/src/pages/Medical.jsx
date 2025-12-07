@@ -12,11 +12,21 @@ export default function Medical() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
 	const [success, setSuccess] = useState("");
+	const computeTotalCost = (quantity, unitPrice) => {
+		const qty = Number(quantity || 0);
+		const price = Number(unitPrice || 0);
+		const total = qty * price;
+		if (!Number.isFinite(total) || total <= 0) return "";
+		return (Math.round(total * 100) / 100).toString();
+	};
+
 	const [form, setForm] = useState({
 		batch_no: "",
 		date: today,
 		medicine_name: "",
 		quantity: "",
+		unitPrice: "",
+		totalCost: "",
 		dose: "",
 	});
 	const [editingRecord, setEditingRecord] = useState(null);
@@ -39,14 +49,38 @@ export default function Medical() {
 		fetchRecords();
 	}, []);
 
-	const onChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+	const onChange = (e) => {
+		const { name, value } = e.target;
+		setForm((prev) => {
+			const next = { ...prev, [name]: value };
+			if (name === "quantity" || name === "unitPrice") {
+				next.totalCost = computeTotalCost(next.quantity, next.unitPrice);
+			}
+			return next;
+		});
+	};
 
 	const onSubmit = async (e) => {
 		e.preventDefault();
 		setError("");
 		setSuccess("");
-		if (!form.batch_no || !form.medicine_name || !form.quantity || !form.dose) {
+		if (!form.batch_no || !form.medicine_name || !form.quantity || !form.dose || !form.unitPrice) {
 			setError("All fields are required.");
+			return;
+		}
+		const quantityValue = Number(form.quantity);
+		const unitPriceValue = Number(form.unitPrice);
+		const totalCostValue = Number(form.totalCost || 0);
+		if (!Number.isFinite(quantityValue) || quantityValue <= 0) {
+			setError("Quantity must be greater than zero.");
+			return;
+		}
+		if (!Number.isFinite(unitPriceValue) || unitPriceValue <= 0) {
+			setError("Unit price must be greater than zero.");
+			return;
+		}
+		if (!Number.isFinite(totalCostValue) || totalCostValue <= 0) {
+			setError("Total cost is invalid.");
 			return;
 		}
 		setSavingEdit(true);
@@ -57,7 +91,9 @@ export default function Medical() {
 					batch_no: form.batch_no,
 					date: form.date,
 					medicine_name: form.medicine_name,
-					quantity: Number(form.quantity),
+					quantity: quantityValue,
+					unitPrice: unitPriceValue,
+					totalCost: totalCostValue,
 					dose: form.dose,
 				});
 				setSuccess("Medicine entry updated.");
@@ -65,11 +101,21 @@ export default function Medical() {
 			} else {
 				await medicineApi.create({
 					...form,
-					quantity: Number(form.quantity),
+					quantity: quantityValue,
+					unitPrice: unitPriceValue,
+					totalCost: totalCostValue,
 				});
 				setSuccess("Medicine saved.");
 			}
-			setForm({ batch_no: form.batch_no, date: today, medicine_name: "", quantity: "", dose: "" });
+			setForm({
+				batch_no: form.batch_no,
+				date: today,
+				medicine_name: "",
+				quantity: "",
+				unitPrice: "",
+				totalCost: "",
+				dose: "",
+			});
 			fetchRecords();
 		} catch (err) {
 			setError(err.response?.data?.error || err.message || "Unable to save record");
@@ -85,6 +131,11 @@ export default function Medical() {
 			date: formatIndiaDate(rec.date) || today,
 			medicine_name: rec.medicine_name,
 			quantity: rec.quantity?.toString() || "",
+			unitPrice: rec.unitPrice?.toString() || "",
+			totalCost:
+				rec.totalCost?.toString() ||
+				computeTotalCost(rec.quantity, rec.unitPrice) ||
+				"",
 			dose: rec.dose || "",
 		});
 		setError("");
@@ -93,7 +144,7 @@ export default function Medical() {
 
 	const cancelEdit = () => {
 		setEditingRecord(null);
-		setForm({ batch_no: "", date: today, medicine_name: "", quantity: "", dose: "" });
+		setForm({ batch_no: "", date: today, medicine_name: "", quantity: "", unitPrice: "", totalCost: "", dose: "" });
 	};
 
 	return (
@@ -141,6 +192,28 @@ export default function Medical() {
 							onChange={onChange}
 						/>
 					</label>
+					<label>
+						<span>Unit price</span>
+						<input
+							type="number"
+							min="0"
+							step="0.01"
+							name="unitPrice"
+							value={form.unitPrice}
+							onChange={onChange}
+						/>
+					</label>
+					<label>
+						<span>Total cost</span>
+						<input
+							type="number"
+							min="0"
+							step="0.01"
+							name="totalCost"
+							value={form.totalCost}
+							readOnly
+						/>
+					</label>
 					<label className="grid-full">
 						<span>Dose / instructions</span>
 						<input name="dose" value={form.dose} onChange={onChange} />
@@ -168,6 +241,8 @@ export default function Medical() {
 								<th>Batch</th>
 								<th>Medicine</th>
 								<th>Quantity</th>
+								<th>Unit price</th>
+								<th>Total cost</th>
 								<th>Dose</th>
 								<th>Actions</th>
 							</tr>
@@ -175,7 +250,7 @@ export default function Medical() {
 						<tbody>
 							{records.length === 0 && (
 								<tr>
-									<td colSpan="5" style={{ textAlign: "center" }}>
+									<td colSpan="8" style={{ textAlign: "center" }}>
 										{loading ? "Loading..." : "No records yet"}
 									</td>
 								</tr>
@@ -186,6 +261,8 @@ export default function Medical() {
 									<td>{batchLabelMap[rec.batch_no] || rec.batch_no}</td>
 									<td>{rec.medicine_name}</td>
 									<td>{rec.quantity}</td>
+									<td>{rec.unitPrice ? Number(rec.unitPrice).toFixed(2) : "-"}</td>
+									<td>{rec.totalCost ? Number(rec.totalCost).toFixed(2) : "-"}</td>
 									<td>{rec.dose}</td>
 									<td>
 										<button type="button" className="link" onClick={() => onEditRecord(rec)}>

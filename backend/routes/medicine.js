@@ -3,6 +3,8 @@ const router = express.Router();
 const Medicine = require("../models/Medicine");
 const Flock = require("../models/Flock");
 
+const roundMoney = (value) => Math.round(value * 100) / 100;
+
 // ✅ GET active batch numbers (MongoDB version)
 router.get("/batches", async (req, res) => {
   try {
@@ -22,18 +24,32 @@ router.get("/batches", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const ownerId = req.user._id;
-    const { batch_no, date, medicine_name, quantity, dose } = req.body;
+    const { batch_no, date, medicine_name, quantity, dose, unitPrice } = req.body;
 
     const batch = await Flock.findOne({ batch_no, owner: ownerId });
     if (!batch) return res.status(404).json({ error: "Batch not found" });
 
+    const qtyValue = Number(quantity);
+    if (!Number.isFinite(qtyValue) || qtyValue <= 0) return res.status(400).json({ error: "quantity must be greater than 0" });
+
+    const priceValue = Number(unitPrice);
+    if (!Number.isFinite(priceValue) || priceValue <= 0) return res.status(400).json({ error: "unitPrice must be greater than 0" });
+
+    const parsedDate = date ? new Date(date) : new Date();
+    if (Number.isNaN(parsedDate.getTime())) return res.status(400).json({ error: "Invalid date" });
+    parsedDate.setUTCHours(0, 0, 0, 0);
+
+    const totalCost = roundMoney(qtyValue * priceValue);
+
     const med = new Medicine({
       owner: ownerId,
       batch_no,
-      date,
+      date: parsedDate,
       medicine_name,
-      quantity,
-      dose
+      quantity: qtyValue,
+      dose,
+      unitPrice: priceValue,
+      totalCost
     });
 
     await med.save();
@@ -61,7 +77,7 @@ router.patch('/:id', async (req, res) => {
   try {
     const ownerId = req.user._id;
     const { id } = req.params;
-    const { batch_no, date, medicine_name, quantity, dose } = req.body || {};
+    const { batch_no, date, medicine_name, quantity, dose, unitPrice } = req.body || {};
 
     const med = await Medicine.findOne({ _id: id, owner: ownerId });
     if (!med) return res.status(404).json({ error: 'Medicine entry not found' });
@@ -75,15 +91,32 @@ router.patch('/:id', async (req, res) => {
       if (!date) return res.status(400).json({ error: 'date is required' });
       const parsedDate = new Date(date);
       if (Number.isNaN(parsedDate.getTime())) return res.status(400).json({ error: 'Invalid date' });
+      parsedDate.setUTCHours(0, 0, 0, 0);
       med.date = parsedDate;
     }
     if (medicine_name !== undefined) med.medicine_name = medicine_name;
+    let nextQuantity = typeof med.quantity === 'number' ? med.quantity : 0;
+    let nextUnitPrice = typeof med.unitPrice === 'number' ? med.unitPrice : 0;
+    let shouldRecomputeCost = false;
     if (quantity !== undefined) {
       const qty = Number(quantity);
-      if (!Number.isFinite(qty) || qty < 0) return res.status(400).json({ error: 'quantity must be >= 0' });
+      if (!Number.isFinite(qty) || qty <= 0) return res.status(400).json({ error: 'quantity must be > 0' });
       med.quantity = qty;
+      nextQuantity = qty;
+      shouldRecomputeCost = true;
     }
     if (dose !== undefined) med.dose = dose;
+    if (unitPrice !== undefined) {
+      const priceValue = Number(unitPrice);
+      if (!Number.isFinite(priceValue) || priceValue <= 0) return res.status(400).json({ error: 'unitPrice must be > 0' });
+      med.unitPrice = priceValue;
+      nextUnitPrice = priceValue;
+      shouldRecomputeCost = true;
+    }
+
+    if (shouldRecomputeCost) {
+      med.totalCost = roundMoney(nextQuantity * nextUnitPrice);
+    }
 
     await med.save();
     res.json(med);

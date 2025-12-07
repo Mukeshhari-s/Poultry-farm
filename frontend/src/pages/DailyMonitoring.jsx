@@ -46,6 +46,7 @@ export default function DailyMonitoring() {
 	const [reportRows, setReportRows] = useState([]);
 	const [reportSummary, setReportSummary] = useState(null);
 	const [reportLoading, setReportLoading] = useState(false);
+	const [reportMeta, setReportMeta] = useState(null);
 
 	const selectedFlock = useMemo(
 		() => flocks.find((f) => f.batch_no === selectedBatch),
@@ -55,6 +56,9 @@ export default function DailyMonitoring() {
 		if (!selectedFlock?.start_date) return "";
 		return formatIndiaDate(selectedFlock.start_date);
 	}, [selectedFlock]);
+
+	const nextRequiredDate = reportMeta?.nextRequiredDate || "";
+	const entriesUpToDate = Boolean(reportMeta?.dailyCompleteThroughToday);
 
 	useEffect(() => {
 		if (!selectedBatch && flocks.length > 0) {
@@ -73,6 +77,14 @@ export default function DailyMonitoring() {
 		});
 	}, [batchStartDate]);
 
+	useEffect(() => {
+		if (nextRequiredDate) {
+			setForm((prev) => ({ ...prev, date: nextRequiredDate }));
+		} else if (selectedBatch) {
+			setForm((prev) => ({ ...prev, date: today }));
+		}
+	}, [nextRequiredDate, selectedBatch]);
+
 	const onChange = (e) => {
 		const { name, value } = e.target;
 		setForm((prev) => ({ ...prev, [name]: value }));
@@ -86,8 +98,10 @@ export default function DailyMonitoring() {
 			const data = await reportApi.current({ batch_no });
 			setReportRows(data.rows || []);
 			setReportSummary(data.summary || null);
+			setReportMeta(data.meta || null);
 		} catch (err) {
 			setError(err.response?.data?.error || err.message || "Unable to load report");
+			setReportMeta(null);
 		} finally {
 			setReportLoading(false);
 		}
@@ -100,6 +114,7 @@ export default function DailyMonitoring() {
 	useEffect(() => {
 		setEditingRow(null);
 		setEditForm(emptyEditForm);
+		setReportMeta(null);
 	}, [selectedBatch]);
 
 	const hasEntryForSelectedDate = useMemo(() => {

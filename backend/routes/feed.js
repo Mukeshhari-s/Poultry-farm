@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const Feed = require('../models/Feed');
 const Flock = require('../models/Flock');
+
+function roundMoney(value) {
+  return Math.round(value * 100) / 100;
+}
 function isFutureDate(d) {
   if (!d) return false;
   const input = new Date(d);
@@ -50,7 +54,7 @@ async function getFeedBalance({ ownerId, flockId }) {
 router.post('/in', async (req, res) => {
   try {
     const ownerId = req.user._id;
-    const { type, date, bagsIn = 0, kgPerBag = 0, flockId } = req.body;
+    const { type, date, bagsIn = 0, kgPerBag = 0, flockId, unitPrice } = req.body;
     if (!type) return res.status(400).json({ error: 'type is required' });
     const { display: normalizedType, key: typeKey } = normalizeType(type);
     if (!normalizedType) return res.status(400).json({ error: 'type is required' });
@@ -65,6 +69,12 @@ router.post('/in', async (req, res) => {
     }
 
     const kgIn = roundKg(bagsValue * kgPerBagValue);
+
+    const unitPriceValue = Number(unitPrice ?? 0);
+    if (!Number.isFinite(unitPriceValue) || unitPriceValue <= 0) {
+      return res.status(400).json({ error: 'unitPrice must be greater than 0' });
+    }
+    const totalCost = roundMoney(kgIn * unitPriceValue);
 
     let flockDoc = null;
     if (flockId) {
@@ -84,6 +94,8 @@ router.post('/in', async (req, res) => {
       bagsIn: bagsValue,
       kgPerBag: kgPerBagValue,
       kgIn,
+      unitPrice: unitPriceValue,
+      totalCost,
       flockId: flockDoc?._id || null,
       batch_no: flockDoc?.batch_no || null,
     });
@@ -99,7 +111,7 @@ router.post('/in', async (req, res) => {
 router.post('/out', async (req, res) => {
   try {
     const ownerId = req.user._id;
-    const { type, date, bagsOut = 0, kgPerBag = 0, flockId } = req.body;
+    const { type, date, bagsOut = 0, kgPerBag = 0, flockId, unitPrice } = req.body;
     if (!type) return res.status(400).json({ error: 'type is required' });
     const { display: normalizedType, key: typeKey } = normalizeType(type);
     if (!normalizedType) return res.status(400).json({ error: 'type is required' });
@@ -135,6 +147,12 @@ router.post('/out', async (req, res) => {
     if (Number.isNaN(entryDate.getTime())) return res.status(400).json({ error: 'Invalid date' });
     entryDate.setUTCHours(0, 0, 0, 0);
 
+    const unitPriceValue = Number(unitPrice ?? 0);
+    if (!Number.isFinite(unitPriceValue) || unitPriceValue <= 0) {
+      return res.status(400).json({ error: 'unitPrice must be greater than 0' });
+    }
+    const totalCost = roundMoney(kgOutValue * unitPriceValue);
+
     const feed = new Feed({
       owner: ownerId,
       type: normalizedType,
@@ -143,6 +161,8 @@ router.post('/out', async (req, res) => {
       bagsOut: bagsValue,
       kgPerBag: kgPerBagValue,
       kgOut: kgOutValue,
+      unitPrice: unitPriceValue,
+      totalCost,
       flockId: flockDoc?._id || null,
       batch_no: flockDoc?.batch_no || null,
     });
@@ -175,7 +195,7 @@ router.patch('/:id', async (req, res) => {
   try {
     const ownerId = req.user._id;
     const { id } = req.params;
-    const { type, date, bagsIn, bagsOut, kgPerBag, kgIn, kgOut, flockId } = req.body || {};
+    const { type, date, bagsIn, bagsOut, kgPerBag, kgIn, kgOut, flockId, unitPrice, totalCost } = req.body || {};
 
     const feed = await Feed.findOne({ _id: id, owner: ownerId });
     if (!feed) return res.status(404).json({ error: 'Feed entry not found' });
@@ -258,6 +278,35 @@ router.patch('/:id', async (req, res) => {
         feed.flockId = flockDoc._id;
         feed.batch_no = flockDoc.batch_no;
       }
+    }
+
+    let nextUnitPrice = typeof feed.unitPrice === 'number' ? feed.unitPrice : 0;
+    let shouldRecomputeCost = false;
+
+    if (unitPrice !== undefined) {
+      const value = Number(unitPrice);
+      if (!Number.isFinite(value) || value <= 0) return res.status(400).json({ error: 'unitPrice must be greater than 0' });
+      feed.unitPrice = value;
+      nextUnitPrice = value;
+      shouldRecomputeCost = true;
+    }
+
+    if (
+      shouldRecomputeKgIn || shouldRecomputeKgOut ||
+      (kgIn !== undefined && feed.kgIn > 0) ||
+      (kgOut !== undefined && feed.kgOut > 0)
+    ) {
+      shouldRecomputeCost = true;
+    }
+
+    if (shouldRecomputeCost) {
+      const baseKg = feed.kgIn > 0 ? feed.kgIn : feed.kgOut;
+      const computedCost = roundMoney(baseKg * nextUnitPrice);
+      feed.totalCost = computedCost;
+    } else if (totalCost !== undefined) {
+      const value = Number(totalCost);
+      if (!Number.isFinite(value) || value < 0) return res.status(400).json({ error: 'totalCost cannot be negative' });
+      feed.totalCost = roundMoney(value);
     }
 
     const saved = await feed.save();

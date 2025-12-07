@@ -7,6 +7,7 @@ const DailyMonitoring = require('../models/DailyMonitoring');
 const Feed = require('../models/Feed');
 const Medicine = require('../models/Medicine');
 const Sale = require('../models/Sale');
+const { parseDateOnly, computeNextRequiredDate, getDateLabel } = require('../utils/date');
 
 const safeNum = v => {
   if (v === undefined || v === null) return 0;
@@ -118,6 +119,12 @@ router.get('/', async (req, res) => {
     const lastCumulativeMort = cumulativeMort;
     const remainingChicks = Math.max(0, totalChicks - lastCumulativeMort - totalBirdsSold);
 
+    const nextRequiredDateObj = computeNextRequiredDate(flock.start_date, daily);
+    const todayDateOnly = parseDateOnly(new Date());
+    const needsEntry = nextRequiredDateObj && todayDateOnly && nextRequiredDateObj.getTime() <= todayDateOnly.getTime();
+    const nextRequiredDateIso = needsEntry ? nextRequiredDateObj.toISOString() : null;
+    const nextRequiredDateLabel = needsEntry ? getDateLabel(nextRequiredDateObj) : null;
+
     const result = {
       flock: {
         _id: flock._id,
@@ -142,7 +149,10 @@ router.get('/', async (req, res) => {
         dailyCount: daily.length,
         feedRecords: feedRecords.length,
         meds: meds.length,
-        sales: sales.length
+        sales: sales.length,
+        nextRequiredDate: nextRequiredDateLabel,
+        nextRequiredDateIso,
+        dailyCompleteThroughToday: !needsEntry,
       }
     };
 

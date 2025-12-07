@@ -7,6 +7,8 @@ const SaleSchema = new mongoose.Schema({
   vehicle_no: { type: String, default: '' },   // optional
   cages: { type: Number, required: true },      // number of cages (int)
   birds: { type: Number, required: true },      // number of birds sold in this record
+  empty_weight: { type: Number, default: 0 },     // vehicle empty weight in kg
+  load_weight: { type: Number, default: 0 },      // vehicle loaded weight in kg
   total_weight: { type: Number, required: true }, // kg (can be fractional)
   remarks: { type: String }
 }, {

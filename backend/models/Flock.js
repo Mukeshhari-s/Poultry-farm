@@ -5,6 +5,7 @@ const FlockSchema = new mongoose.Schema({
   batch_no: { type: String, unique: true, index: true },
   start_date: { type: Date, required: true },
   totalChicks: { type: Number, required: true },
+  pricePerChick: { type: Number, default: 0 },
   status: { type: String, enum: ['active','closed'], default: 'active' },
   remarks: { type: String },
   closedAt: { type: Date },

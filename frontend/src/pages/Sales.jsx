@@ -11,8 +11,18 @@ const emptySaleForm = () => ({
 	cages: "",
 	birds: "",
 	total_weight: "",
+	empty_weight: "",
+	load_weight: "",
 	remarks: "",
 });
+
+const computeNetWeight = (load, empty) => {
+	const loadValue = Number(load || 0);
+	const emptyValue = Number(empty || 0);
+	const diff = loadValue - emptyValue;
+	if (!Number.isFinite(diff) || diff <= 0) return "";
+	return (Math.round(diff * 1000) / 1000).toString();
+};
 
 export default function Sales() {
 	const { flocks } = useFlocks();
@@ -59,7 +69,18 @@ export default function Sales() {
 		setEditForm(emptySaleForm());
 	}, [selectedBatch]);
 
-	const onChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+	const buildFormChangeHandler = (setter) => (e) => {
+		const { name, value } = e.target;
+		setter((prev) => {
+			const next = { ...prev, [name]: value };
+			if (name === "load_weight" || name === "empty_weight") {
+				next.total_weight = computeNetWeight(next.load_weight, next.empty_weight);
+			}
+			return next;
+		});
+	};
+
+	const onChange = buildFormChangeHandler(setForm);
 
 	const onSubmit = async (e) => {
 		e.preventDefault();
@@ -69,15 +90,42 @@ export default function Sales() {
 			setError("Select a batch first");
 			return;
 		}
+		const cagesValue = Number(form.cages || 0);
+		const birdsValue = Number(form.birds || 0);
+		const emptyWeightValue = Number(form.empty_weight || 0);
+		const loadWeightValue = Number(form.load_weight || 0);
+		const netWeightValue = Math.round((loadWeightValue - emptyWeightValue) * 1000) / 1000;
+		if (!Number.isFinite(emptyWeightValue) || emptyWeightValue < 0) {
+			setError("Empty weight must be zero or more.");
+			return;
+		}
+		if (!Number.isFinite(loadWeightValue) || loadWeightValue <= 0) {
+			setError("Load weight must be greater than zero.");
+			return;
+		}
+		if (netWeightValue <= 0) {
+			setError("Load weight must be greater than empty weight.");
+			return;
+		}
+		if (!Number.isFinite(cagesValue) || cagesValue < 0) {
+			setError("Cages must be zero or more.");
+			return;
+		}
+		if (!Number.isFinite(birdsValue) || birdsValue <= 0) {
+			setError("Birds must be greater than zero.");
+			return;
+		}
 		setSaving(true);
 		try {
 			await salesApi.create({
 				batch_no: selectedBatch,
 				date: form.date,
 				vehicle_no: form.vehicle_no,
-				cages: Number(form.cages || 0),
-				birds: Number(form.birds || 0),
-				total_weight: Number(form.total_weight || 0),
+				cages: cagesValue,
+				birds: birdsValue,
+				empty_weight: emptyWeightValue,
+				load_weight: loadWeightValue,
+				total_weight: netWeightValue,
 				remarks: form.remarks,
 			});
 			setSuccess("Sale recorded.");
@@ -90,16 +138,34 @@ export default function Sales() {
 		}
 	};
 
-	const onEditChange = (e) => setEditForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+	const onEditChange = buildFormChangeHandler(setEditForm);
 
 	const startEdit = (sale) => {
 		setEditingSale(sale);
+		const normalizedEmpty =
+			sale.empty_weight === undefined || sale.empty_weight === null
+				? null
+				: Number(sale.empty_weight);
+		const normalizedLoad =
+			sale.load_weight === undefined || sale.load_weight === null
+				? sale.total_weight != null && normalizedEmpty != null
+					? Number(sale.total_weight) + normalizedEmpty
+					: sale.total_weight != null
+					? Number(sale.total_weight)
+					: null
+				: Number(sale.load_weight);
+		const emptyFieldValue = normalizedEmpty == null ? "" : normalizedEmpty.toString();
+		const loadFieldValue = normalizedLoad == null ? "" : normalizedLoad.toString();
+		const netWeightDisplay =
+			computeNetWeight(normalizedLoad, normalizedEmpty) || sale.total_weight?.toString() || "";
 		setEditForm({
 			date: formatIndiaDate(sale.date) || today,
 			vehicle_no: sale.vehicle_no || "",
 			cages: sale.cages?.toString() || "0",
 			birds: sale.birds?.toString() || "0",
-			total_weight: sale.total_weight?.toString() || "0",
+			empty_weight: emptyFieldValue,
+			load_weight: loadFieldValue,
+			total_weight: netWeightDisplay,
 			remarks: sale.remarks || "",
 		});
 		setError("");
@@ -116,16 +182,43 @@ export default function Sales() {
 	const onEditSubmit = async (e) => {
 		e.preventDefault();
 		if (!editingSale) return;
-		setSavingEdit(true);
 		setError("");
 		setSuccess("");
+		const cagesValue = parseNumber(editForm.cages);
+		const birdsValue = parseNumber(editForm.birds);
+		const emptyWeightValue = Number(editForm.empty_weight || 0);
+		const loadWeightValue = Number(editForm.load_weight || 0);
+		const netWeightValue = Math.round((loadWeightValue - emptyWeightValue) * 1000) / 1000;
+		if (!Number.isFinite(emptyWeightValue) || emptyWeightValue < 0) {
+			setError("Empty weight must be zero or more.");
+			return;
+		}
+		if (!Number.isFinite(loadWeightValue) || loadWeightValue <= 0) {
+			setError("Load weight must be greater than zero.");
+			return;
+		}
+		if (netWeightValue <= 0) {
+			setError("Load weight must be greater than empty weight.");
+			return;
+		}
+		if (!Number.isFinite(cagesValue) || cagesValue < 0) {
+			setError("Cages must be zero or more.");
+			return;
+		}
+		if (!Number.isFinite(birdsValue) || birdsValue <= 0) {
+			setError("Birds must be greater than zero.");
+			return;
+		}
+		setSavingEdit(true);
 		try {
 			await salesApi.update(editingSale._id, {
 				date: editForm.date,
 				vehicle_no: editForm.vehicle_no,
-				cages: parseNumber(editForm.cages),
-				birds: parseNumber(editForm.birds),
-				total_weight: parseNumber(editForm.total_weight),
+				cages: cagesValue,
+				birds: birdsValue,
+				empty_weight: emptyWeightValue,
+				load_weight: loadWeightValue,
+				total_weight: netWeightValue,
 				remarks: editForm.remarks,
 			});
 			setSuccess("Sale entry updated.");
@@ -200,6 +293,28 @@ export default function Sales() {
 						<input type="number" min="0" name="birds" value={form.birds} onChange={onChange} />
 					</label>
 					<label>
+						<span>Empty weight (kg)</span>
+						<input
+							type="number"
+							min="0"
+							step="0.01"
+							name="empty_weight"
+							value={form.empty_weight}
+							onChange={onChange}
+						/>
+					</label>
+					<label>
+						<span>Load weight (kg)</span>
+						<input
+							type="number"
+							min="0"
+							step="0.01"
+							name="load_weight"
+							value={form.load_weight}
+							onChange={onChange}
+						/>
+					</label>
+					<label>
 						<span>Total weight (kg)</span>
 						<input
 							type="number"
@@ -207,7 +322,7 @@ export default function Sales() {
 							step="0.01"
 							name="total_weight"
 							value={form.total_weight}
-							onChange={onChange}
+							readOnly
 						/>
 					</label>
 					<label className="grid-full">
@@ -246,8 +361,37 @@ export default function Sales() {
 							<input type="number" min="0" name="birds" value={editForm.birds} onChange={onEditChange} />
 						</label>
 						<label>
+							<span>Empty weight (kg)</span>
+							<input
+								type="number"
+								min="0"
+								step="0.01"
+								name="empty_weight"
+								value={editForm.empty_weight}
+								onChange={onEditChange}
+							/>
+						</label>
+						<label>
+							<span>Load weight (kg)</span>
+							<input
+								type="number"
+								min="0"
+								step="0.01"
+								name="load_weight"
+								value={editForm.load_weight}
+								onChange={onEditChange}
+							/>
+						</label>
+						<label>
 							<span>Total weight (kg)</span>
-							<input type="number" min="0" step="0.01" name="total_weight" value={editForm.total_weight} onChange={onEditChange} />
+							<input
+								type="number"
+								min="0"
+								step="0.01"
+								name="total_weight"
+								value={editForm.total_weight}
+								readOnly
+							/>
 						</label>
 						<label className="grid-full">
 							<span>Remarks</span>

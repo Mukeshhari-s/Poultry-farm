@@ -6,11 +6,12 @@ const connectDB = require('./config/db');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const DEFAULT_MONGO_URI = 'mongodb+srv://rkpoultry:mukesh@946@poultry.rhjgjoy.mongodb.net/?appName=Poultry';
 const helmet = require('helmet');
 app.use(helmet());
 
 // DB connect
-connectDB(process.env.MONGO_URI);
+connectDB(process.env.MONGO_URI || DEFAULT_MONGO_URI);
 
 // middlewares
 app.use(cors());

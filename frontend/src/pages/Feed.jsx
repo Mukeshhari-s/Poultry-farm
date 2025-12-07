@@ -4,6 +4,7 @@ import { feedApi } from "../services/api";
 import { createBatchLabelMap, getTodayISO, formatIndiaDate } from "../utils/helpers";
 
 const today = getTodayISO();
+const FEED_TYPE_CHOICES = ["1", "2", "3", "4", "5"];
 
 const calculateAvailableFeed = (logs, flockId) => {
 	return logs.reduce((acc, log) => {
@@ -16,24 +17,35 @@ const calculateAvailableFeed = (logs, flockId) => {
 };
 
 const defaultInForm = {
-	type: "Starter",
+	type: FEED_TYPE_CHOICES[0],
 	date: today,
 	bagsIn: "",
 	kgPerBag: "",
+	unitPrice: "",
 	flockId: "",
 };
 
 const defaultOutForm = {
-	type: "Starter",
+	type: FEED_TYPE_CHOICES[0],
 	date: today,
 	bagsOut: "",
 	kgPerBag: "",
+	unitPrice: "",
 	flockId: "",
 };
 
 export default function Feed() {
 	const { flocks } = useFlocks();
 	const batchLabelMap = useMemo(() => createBatchLabelMap(flocks), [flocks]);
+	const batchNoToFlockId = useMemo(() => {
+		const map = {};
+		flocks.forEach((flock) => {
+			if (flock?.batch_no !== undefined && flock?.batch_no !== null) {
+				map[String(flock.batch_no)] = flock._id;
+			}
+		});
+		return map;
+	}, [flocks]);
 	const [selectedFlock, setSelectedFlock] = useState("");
 	const [feedLogs, setFeedLogs] = useState([]);
 	const [loading, setLoading] = useState(false);
@@ -53,6 +65,7 @@ export default function Feed() {
 		bagsIn: "",
 		kgPerBag: "",
 		bagsOut: "",
+		unitPrice: "",
 		flockId: "",
 	});
 	const [savingEdit, setSavingEdit] = useState(false);
@@ -65,17 +78,32 @@ export default function Feed() {
 		if (!Number.isFinite(total)) return 0;
 		return Math.round(total * 100) / 100;
 	}, [feedInForm.bagsIn, feedInForm.kgPerBag]);
+	const feedInTotalCost = useMemo(() => {
+		const cost = feedInTotalKg * Number(feedInForm.unitPrice || 0);
+		if (!Number.isFinite(cost) || cost <= 0) return 0;
+		return Math.round(cost * 100) / 100;
+	}, [feedInTotalKg, feedInForm.unitPrice]);
 	const feedOutTotalKg = useMemo(() => {
 		const total = Number(feedOutForm.bagsOut || 0) * Number(feedOutForm.kgPerBag || 0);
 		if (!Number.isFinite(total)) return 0;
 		return Math.round(total * 100) / 100;
 	}, [feedOutForm.bagsOut, feedOutForm.kgPerBag]);
+	const feedOutTotalCost = useMemo(() => {
+		const cost = feedOutTotalKg * Number(feedOutForm.unitPrice || 0);
+		if (!Number.isFinite(cost) || cost <= 0) return 0;
+		return Math.round(cost * 100) / 100;
+	}, [feedOutTotalKg, feedOutForm.unitPrice]);
 	const editFeedTotalKg = useMemo(() => {
 		const bags = editFeedForm.entryType === "out" ? editFeedForm.bagsOut : editFeedForm.bagsIn;
 		const total = Number(bags || 0) * Number(editFeedForm.kgPerBag || 0);
 		if (!Number.isFinite(total)) return 0;
 		return Math.round(total * 100) / 100;
 	}, [editFeedForm.entryType, editFeedForm.bagsIn, editFeedForm.bagsOut, editFeedForm.kgPerBag]);
+	const editFeedTotalCost = useMemo(() => {
+		const cost = editFeedTotalKg * Number(editFeedForm.unitPrice || 0);
+		if (!Number.isFinite(cost) || cost <= 0) return 0;
+		return Math.round(cost * 100) / 100;
+	}, [editFeedTotalKg, editFeedForm.unitPrice]);
 
 	const fetchFeed = async (flockId = "") => {
 		setLoading(true);
@@ -93,6 +121,19 @@ export default function Feed() {
 	useEffect(() => {
 		fetchFeed(selectedFlock);
 	}, [selectedFlock]);
+
+	useEffect(() => {
+		if (selectedFlock || !flocks.length) return;
+		const preferred =
+			flocks.find((flock) => {
+				const label = flock?.batch_no;
+				if (label === undefined || label === null) return false;
+				return String(label).toLowerCase() === "batch 1";
+			}) || flocks[0];
+		if (preferred?._id) {
+			setSelectedFlock(preferred._id);
+		}
+	}, [flocks, selectedFlock]);
 
 	useEffect(() => {
 		setFeedInForm((prev) => ({ ...prev, flockId: selectedFlock }));
@@ -122,6 +163,12 @@ export default function Feed() {
 			setError("Enter kg per bag for feed in.");
 			return;
 		}
+		const unitPriceValue = Number(feedInForm.unitPrice || 0);
+		if (!Number.isFinite(unitPriceValue) || unitPriceValue <= 0) {
+			setError("Enter price per kg for feed in.");
+			return;
+		}
+		const totalCostValue = Math.round(feedInTotalKg * unitPriceValue * 100) / 100;
 		setSavingIn(true);
 		try {
 			await feedApi.addIn({
@@ -130,9 +177,15 @@ export default function Feed() {
 				type: typeValue,
 				bagsIn: bagsValue,
 				kgPerBag: kgPerBagValue,
+				unitPrice: unitPriceValue,
+				totalCost: totalCostValue,
 			});
 			setSuccess("Feed-in recorded.");
-			setFeedInForm((prev) => ({ ...defaultInForm, flockId: prev.flockId || selectedFlock }));
+			setFeedInForm((prev) => ({
+				...defaultInForm,
+				flockId: prev.flockId || selectedFlock,
+				unitPrice: prev.unitPrice,
+			}));
 			fetchFeed(selectedFlock || feedInForm.flockId);
 		} catch (err) {
 			setError(err.response?.data?.error || err.message || "Unable to save feed in");
@@ -170,6 +223,12 @@ export default function Feed() {
 			setError(`Only ${available} kg available for this feed selection.`);
 			return;
 		}
+		const unitPriceValue = Number(feedOutForm.unitPrice || 0);
+		if (!Number.isFinite(unitPriceValue) || unitPriceValue <= 0) {
+			setError("Enter price per kg for feed out.");
+			return;
+		}
+		const totalCostValue = Math.round(kgOutValue * unitPriceValue * 100) / 100;
 		setSavingOut(true);
 		try {
 			await feedApi.addOut({
@@ -178,9 +237,15 @@ export default function Feed() {
 				type: typeValue,
 				bagsOut: bagsValue,
 				kgPerBag: kgPerBagValue,
+				unitPrice: unitPriceValue,
+				totalCost: totalCostValue,
 			});
 			setSuccess("Feed-out recorded.");
-			setFeedOutForm((prev) => ({ ...defaultOutForm, flockId: prev.flockId || selectedFlock }));
+			setFeedOutForm((prev) => ({
+				...defaultOutForm,
+				flockId: prev.flockId || selectedFlock,
+				unitPrice: prev.unitPrice,
+			}));
 			fetchFeed(selectedFlock || feedOutForm.flockId);
 		} catch (err) {
 			setError(err.response?.data?.error || err.message || "Unable to save feed out");
@@ -188,17 +253,6 @@ export default function Feed() {
 			setSavingOut(false);
 		}
 	};
-
-	const flockOptions = (
-		<select value={selectedFlock} onChange={(e) => setSelectedFlock(e.target.value)}>
-			<option value="">All batches</option>
-			{flocks.map((f) => (
-				<option key={f._id} value={f._id}>
-					{f.displayLabel || f.batch_no || f._id}
-				</option>
-			))}
-		</select>
-	);
 
 	const onEditFeed = (log) => {
 		const entryType = log.kgOut && Number(log.kgOut) > 0 ? "out" : "in";
@@ -209,6 +263,14 @@ export default function Feed() {
 				: log.bagsOut
 				? Number(log.kgOut || 0) / Number(log.bagsOut || 1)
 				: 0);
+		const resolvedFlockId =
+			log.flockId ||
+			(log.batch_no ? batchNoToFlockId[String(log.batch_no)] : "") ||
+			selectedFlock ||
+			"";
+		if (resolvedFlockId && resolvedFlockId !== selectedFlock) {
+			setSelectedFlock(resolvedFlockId);
+		}
 		setEditingFeed(log);
 		setEditFeedForm({
 			id: log._id,
@@ -218,7 +280,8 @@ export default function Feed() {
 			bagsIn: log.bagsIn?.toString() || "",
 			bagsOut: log.bagsOut?.toString() || "",
 			kgPerBag: derivedKgPerBag ? derivedKgPerBag.toString() : "",
-			flockId: log.flockId || selectedFlock || "",
+			unitPrice: log.unitPrice?.toString() || "",
+			flockId: resolvedFlockId,
 		});
 		setError("");
 		setSuccess("");
@@ -248,11 +311,16 @@ export default function Feed() {
 				if (!Number.isFinite(bagsValue) || bagsValue <= 0) throw new Error("Bags must be > 0 for feed out");
 				if (!Number.isFinite(kgPerBagValue) || kgPerBagValue <= 0) throw new Error("Kg per bag must be > 0 for feed out");
 			}
+			const unitPriceValue = Number(editFeedForm.unitPrice || 0);
+			if (!Number.isFinite(unitPriceValue) || unitPriceValue <= 0) throw new Error("Price per kg must be > 0");
+			const totalCostValue = Math.round(editFeedTotalKg * unitPriceValue * 100) / 100;
 
 			const payload = {
 				type: typeValue,
 				date: editFeedForm.date,
 				flockId: editFeedForm.flockId,
+				unitPrice: unitPriceValue,
+				totalCost: totalCostValue,
 			};
 			if (editFeedForm.entryType === "in") {
 				payload.bagsIn = editFeedForm.bagsIn ? Number(editFeedForm.bagsIn) : 0;
@@ -282,7 +350,6 @@ export default function Feed() {
 					<h1>Feed Management</h1>
 					<p>Track feed stock entering and leaving the farm.</p>
 				</div>
-				<div className="filters">{flockOptions}</div>
 			</div>
 
 			{error && <div className="error mb">{error}</div>}
@@ -318,7 +385,16 @@ export default function Feed() {
 						</label>
 						<label>
 							<span>Feed type</span>
-							<input value={editFeedForm.type} onChange={(e) => setEditFeedForm({ ...editFeedForm, type: e.target.value })} />
+							<select value={editFeedForm.type} onChange={(e) => setEditFeedForm({ ...editFeedForm, type: e.target.value })}>
+								{FEED_TYPE_CHOICES.map((choice) => (
+									<option key={choice} value={choice}>
+										{choice}
+									</option>
+								))}
+								{editFeedForm.type && !FEED_TYPE_CHOICES.includes(editFeedForm.type) && (
+									<option value={editFeedForm.type}>{editFeedForm.type}</option>
+								)}
+							</select>
 						</label>
 						{editFeedForm.entryType === "in" ? (
 							<>
@@ -341,8 +417,18 @@ export default function Feed() {
 										onChange={(e) => setEditFeedForm({ ...editFeedForm, kgPerBag: e.target.value })}
 									/>
 								</label>
+								<label>
+									<span>Price per kg</span>
+									<input
+										type="number"
+										min="0"
+										step="0.01"
+										value={editFeedForm.unitPrice}
+										onChange={(e) => setEditFeedForm({ ...editFeedForm, unitPrice: e.target.value })}
+									/>
+								</label>
 								<div className="grid-full" style={{ fontSize: "0.9rem", color: "var(--text-muted, #555)" }}>
-									Total feed this entry: {editFeedTotalKg.toFixed(2)} kg
+									Total feed this entry: {editFeedTotalKg.toFixed(2)} kg · Cost: {editFeedTotalCost.toFixed(2)}
 								</div>
 							</>
 						) : (
@@ -366,8 +452,18 @@ export default function Feed() {
 										onChange={(e) => setEditFeedForm({ ...editFeedForm, kgPerBag: e.target.value })}
 									/>
 								</label>
+								<label>
+									<span>Price per kg</span>
+									<input
+										type="number"
+										min="0"
+										step="0.01"
+										value={editFeedForm.unitPrice}
+										onChange={(e) => setEditFeedForm({ ...editFeedForm, unitPrice: e.target.value })}
+									/>
+								</label>
 								<div className="grid-full" style={{ fontSize: "0.9rem", color: "var(--text-muted, #555)" }}>
-									Total feed this entry: {editFeedTotalKg.toFixed(2)} kg
+									Total feed this entry: {editFeedTotalKg.toFixed(2)} kg · Cost: {editFeedTotalCost.toFixed(2)}
 								</div>
 							</>
 						)}
@@ -414,11 +510,20 @@ export default function Feed() {
 						</label>
 						<label>
 							<span>Feed type</span>
-							<input
+							<select
 								name="type"
 								value={feedInForm.type}
 								onChange={(e) => setFeedInForm({ ...feedInForm, type: e.target.value })}
-							/>
+							>
+								{FEED_TYPE_CHOICES.map((choice) => (
+									<option key={choice} value={choice}>
+										{choice}
+									</option>
+								))}
+								{feedInForm.type && !FEED_TYPE_CHOICES.includes(feedInForm.type) && (
+									<option value={feedInForm.type}>{feedInForm.type}</option>
+								)}
+							</select>
 						</label>
 						<label>
 							<span>Total bags</span>
@@ -441,8 +546,19 @@ export default function Feed() {
 								onChange={(e) => setFeedInForm({ ...feedInForm, kgPerBag: e.target.value })}
 							/>
 						</label>
+						<label>
+							<span>Price per kg</span>
+							<input
+								type="number"
+								min="0"
+								step="0.01"
+								name="unitPrice"
+								value={feedInForm.unitPrice}
+								onChange={(e) => setFeedInForm({ ...feedInForm, unitPrice: e.target.value })}
+							/>
+						</label>
 						<div className="grid-full" style={{ fontSize: "0.9rem", color: "var(--text-muted, #555)" }}>
-							Total feed this entry: {feedInTotalKg.toFixed(2)} kg
+							Total feed this entry: {feedInTotalKg.toFixed(2)} kg · Cost: {feedInTotalCost.toFixed(2)}
 						</div>
 						<div className="grid-full">
 							<button type="submit" disabled={savingIn}>
@@ -482,11 +598,20 @@ export default function Feed() {
 						</label>
 						<label>
 							<span>Feed type</span>
-							<input
+							<select
 								name="type"
 								value={feedOutForm.type}
 								onChange={(e) => setFeedOutForm({ ...feedOutForm, type: e.target.value })}
-							/>
+							>
+								{FEED_TYPE_CHOICES.map((choice) => (
+									<option key={choice} value={choice}>
+										{choice}
+									</option>
+								))}
+								{feedOutForm.type && !FEED_TYPE_CHOICES.includes(feedOutForm.type) && (
+									<option value={feedOutForm.type}>{feedOutForm.type}</option>
+								)}
+							</select>
 						</label>
 						<label>
 							<span>Bags used</span>
@@ -509,8 +634,19 @@ export default function Feed() {
 								onChange={(e) => setFeedOutForm({ ...feedOutForm, kgPerBag: e.target.value })}
 							/>
 						</label>
+						<label>
+							<span>Price per kg</span>
+							<input
+								type="number"
+								min="0"
+								step="0.01"
+								name="unitPrice"
+								value={feedOutForm.unitPrice}
+								onChange={(e) => setFeedOutForm({ ...feedOutForm, unitPrice: e.target.value })}
+							/>
+						</label>
 						<div className="grid-full" style={{ fontSize: "0.9rem", color: "var(--text-muted, #555)" }}>
-							Total feed this entry: {feedOutTotalKg.toFixed(2)} kg · Available: {Math.max(feedOutAvailable, 0).toFixed(2)} kg
+							Total feed this entry: {feedOutTotalKg.toFixed(2)} kg · Cost: {feedOutTotalCost.toFixed(2)} · Available: {Math.max(feedOutAvailable, 0).toFixed(2)} kg
 						</div>
 						<div className="grid-full">
 							<button type="submit" disabled={savingOut}>
@@ -534,6 +670,8 @@ export default function Feed() {
 								<th>Kg/bag</th>
 								<th>Kg in</th>
 								<th>Kg out</th>
+								<th>Unit price</th>
+								<th>Total cost</th>
 								<th>Batch</th>
 								<th>Actions</th>
 							</tr>
@@ -541,7 +679,7 @@ export default function Feed() {
 						<tbody>
 							{feedLogs.length === 0 && (
 								<tr>
-									<td colSpan="9" style={{ textAlign: "center" }}>
+									<td colSpan="11" style={{ textAlign: "center" }}>
 										{loading ? "Loading..." : "No feed entries"}
 									</td>
 								</tr>
@@ -562,6 +700,8 @@ export default function Feed() {
 								const perBagDisplay = numericPerBag && Number.isFinite(numericPerBag)
 									? numericPerBag.toFixed(2)
 									: "-";
+								const unitPriceDisplay = log.unitPrice ? Number(log.unitPrice).toFixed(2) : "-";
+								const totalCostDisplay = log.totalCost ? Number(log.totalCost).toFixed(2) : "-";
 								return (
 									<tr key={log._id}>
 										<td>{formatIndiaDate(log.date)}</td>
@@ -571,6 +711,8 @@ export default function Feed() {
 										<td>{perBagDisplay}</td>
 										<td>{log.kgIn || "-"}</td>
 										<td>{log.kgOut || "-"}</td>
+										<td>{unitPriceDisplay}</td>
+										<td>{totalCostDisplay}</td>
 										<td>{batchLabel || "-"}</td>
 										<td>
 											<button type="button" className="link" onClick={() => onEditFeed(log)}>
