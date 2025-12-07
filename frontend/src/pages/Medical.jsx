@@ -12,6 +12,13 @@ export default function Medical() {
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
 	const [success, setSuccess] = useState("");
+	const cumulativeMedicineCost = useMemo(() => {
+		return records.reduce((acc, rec) => {
+			const cost = Number(rec.totalCost || 0);
+			if (!Number.isFinite(cost) || cost <= 0) return acc;
+			return acc + cost;
+		}, 0);
+	}, [records]);
 	const computeTotalCost = (quantity, unitPrice) => {
 		const qty = Number(quantity || 0);
 		const price = Number(unitPrice || 0);
@@ -273,6 +280,9 @@ export default function Medical() {
 							))}
 						</tbody>
 					</table>
+					<div className="stat-note" style={{ marginTop: "0.75rem", fontSize: "0.95rem" }}>
+						Cumulative medicine cost: {cumulativeMedicineCost.toFixed(2)}
+					</div>
 				</div>
 			</div>
 		</div>

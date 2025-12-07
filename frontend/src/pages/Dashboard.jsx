@@ -57,7 +57,12 @@ export default function Dashboard() {
         </div>
         <div className="stat-card">
           <span>Feed remaining (kg)</span>
-          <strong>{summary?.feedRemaining ?? "-"}</strong>
+          <strong>
+            {summary?.feedRemaining ?? "-"}
+            {summary?.feedRemaining ? (
+              <span className="stat-subtext"> ({(summary.feedRemaining / 60).toFixed(2)} bags)</span>
+            ) : null}
+          </strong>
         </div>
         <div className="stat-card">
           <span>Birds sold</span>

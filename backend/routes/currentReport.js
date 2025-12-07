@@ -34,6 +34,8 @@ router.get('/', async (req, res) => {
     if (!flock) return res.status(404).json({ error: 'Flock/batch not found' });
 
     const totalChicks = safeNum(flock.totalChicks || flock.total || flock.count || 0);
+    const pricePerChick = safeNum(flock.pricePerChick || flock.price_per_chick);
+    const totalChickCost = pricePerChick > 0 ? totalChicks * pricePerChick : 0;
 
     // 2) fetch daily monitoring ordered by date asc
     const dmQuery = { batch_no: flock.batch_no, owner: ownerId };
@@ -85,9 +87,11 @@ router.get('/', async (req, res) => {
     let totalFeedIn = 0;
     let totalFeedOut = 0;        // feed route withdrawals
     let totalFeedUsed = 0;       // daily monitoring usage
+    let totalFeedCost = 0;
     feedRecords.forEach((f) => {
       totalFeedIn += safeNum(f.kgIn || f.in_kg || f.qty_kg || f.qty || f.inKg || 0);
       const outKg = safeNum(f.kgOut || f.out_kg || f.out || f.used_kg || 0);
+      totalFeedCost += safeNum(f.totalCost || f.total_cost || f.cost || 0);
       if (outKg > 0) {
         if (f.dailyRecord) totalFeedUsed += outKg;
         else totalFeedOut += outKg;
@@ -97,10 +101,13 @@ router.get('/', async (req, res) => {
 
     // 5) medicine grouped by date
     const meds = await Medicine.find({ batch_no: flock.batch_no, owner: ownerId }).lean();
+    let totalMedicineCost = 0;
     const medicineByDate = {};
     meds.forEach(m => {
       const key = m.date ? m.date.toISOString().slice(0,10) : 'unknown';
       if (!medicineByDate[key]) medicineByDate[key] = [];
+      const medCost = safeNum(m.totalCost || m.total_cost || (safeNum(m.quantity) * safeNum(m.unitPrice)));
+      totalMedicineCost += medCost;
       medicineByDate[key].push({
         medicine_name: m.medicine_name || m.name || m.drug,
         quantity: safeNum(m.quantity || m.qty),
@@ -118,6 +125,7 @@ router.get('/', async (req, res) => {
     // final remaining chicks (consider mortality + sold)
     const lastCumulativeMort = cumulativeMort;
     const remainingChicks = Math.max(0, totalChicks - lastCumulativeMort - totalBirdsSold);
+    const avgWeightPerBird = totalBirdsSold > 0 ? totalWeightSold / totalBirdsSold : 0;
 
     const nextRequiredDateObj = computeNextRequiredDate(flock.start_date, daily);
     const todayDateOnly = parseDateOnly(new Date());
@@ -138,10 +146,14 @@ router.get('/', async (req, res) => {
         totalFeedOut,
         totalFeedUsed,
         feedRemaining,
+        totalFeedCost,
         totalBirdsSold,
         totalWeightSold,
+        avgWeightPerBird,
         cumulativeMortality: lastCumulativeMort,
-        cumulativeMortalityPercent: totalChicks > 0 ? Number(((lastCumulativeMort / totalChicks) * 100).toFixed(2)) : 0
+        cumulativeMortalityPercent: totalChicks > 0 ? Number(((lastCumulativeMort / totalChicks) * 100).toFixed(2)) : 0,
+        totalMedicineCost,
+        totalChickCost
       },
       rows,
       medicineByDate,

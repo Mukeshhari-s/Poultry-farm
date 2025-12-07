@@ -42,10 +42,19 @@ export default function Sales() {
 		if (!records.length) {
 			return { totalBirds: 0, totalWeight: 0, avgPerBird: 0 };
 		}
-		const totalBirds = records.reduce((sum, sale) => sum + Number(sale.birds || 0), 0);
-		const totalWeight = records.reduce((sum, sale) => sum + Number(sale.total_weight || 0), 0);
-		const avgPerBird = totalBirds > 0 ? totalWeight / totalBirds : 0;
-		return { totalBirds, totalWeight, avgPerBird };
+		const totals = records.reduce(
+			(acc, sale) => {
+				const birds = Number(sale.birds || 0);
+				const weight = Number(sale.total_weight || 0);
+				return {
+					totalBirds: acc.totalBirds + (Number.isFinite(birds) ? birds : 0),
+					totalWeight: acc.totalWeight + (Number.isFinite(weight) ? weight : 0),
+				};
+			},
+			{ totalBirds: 0, totalWeight: 0 }
+		);
+		const avgPerBird = totals.totalBirds > 0 ? totals.totalWeight / totals.totalBirds : 0;
+		return { ...totals, avgPerBird };
 	}, [records]);
 
 	const fetchSales = async (batch_no) => {
@@ -477,6 +486,10 @@ export default function Sales() {
 					<div className="stat-card">
 						<span>Total birds sold</span>
 						<strong>{saleStats.totalBirds}</strong>
+					</div>
+					<div className="stat-card">
+						<span>Total weight sold (kg)</span>
+						<strong>{saleStats.totalWeight > 0 ? saleStats.totalWeight.toFixed(3) : "-"}</strong>
 					</div>
 					<div className="stat-card">
 						<span>Avg weight per bird (kg)</span>

@@ -3,6 +3,23 @@ import useFlocks from "../hooks/useFlocks";
 import { reportApi } from "../services/api";
 import { formatIndiaDate } from "../utils/helpers";
 
+const formatBagsFromKg = (kgValue) => {
+	const num = Number(kgValue);
+	if (!Number.isFinite(num)) return null;
+	return (num / 60).toFixed(2);
+};
+
+const hasValue = (value) => value !== null && value !== undefined && !Number.isNaN(Number(value));
+
+const formatStatValue = (value, options = {}) => {
+	if (!hasValue(value)) return "-";
+	const num = Number(value);
+	if (options.decimals !== undefined) {
+		return num.toFixed(options.decimals);
+	}
+	return num;
+};
+
 export default function CurrentReport() {
 	const { flocks } = useFlocks();
 	const batchOptions = flocks.map((f) => ({
@@ -72,33 +89,75 @@ export default function CurrentReport() {
 				<div className="stat-grid">
 					<div className="stat-card">
 						<span>Remaining chicks</span>
-						<strong>{summary.remainingChicks}</strong>
+						<strong>{formatStatValue(summary.remainingChicks)}</strong>
 					</div>
 					<div className="stat-card">
 						<span>Cumulative mortality</span>
 						<strong>
-							{summary.cumulativeMortality} ({summary.cumulativeMortalityPercent}% )
+							{formatStatValue(summary.cumulativeMortality)} ({formatStatValue(summary.cumulativeMortalityPercent)}% )
 						</strong>
 					</div>
 					<div className="stat-card">
+						<span>Chick cost</span>
+						<strong>{formatStatValue(summary.totalChickCost)}</strong>
+					</div>
+					<div className="stat-card">
 						<span>Feed in (kg)</span>
-						<strong>{summary.totalFeedIn ?? 0}</strong>
+						<strong>
+							{formatStatValue(summary.totalFeedIn)}
+							{hasValue(summary.totalFeedIn) ? (
+								<span className="stat-subtext"> ({formatBagsFromKg(summary.totalFeedIn)} bags)</span>
+							) : null}
+						</strong>
 					</div>
 					<div className="stat-card">
 						<span>Feed out (kg)</span>
-						<strong>{summary.totalFeedOut ?? 0}</strong>
+						<strong>
+							{formatStatValue(summary.totalFeedOut)}
+							{hasValue(summary.totalFeedOut) ? (
+								<span className="stat-subtext"> ({formatBagsFromKg(summary.totalFeedOut)} bags)</span>
+							) : null}
+						</strong>
 					</div>
 					<div className="stat-card">
 						<span>Feed used (kg)</span>
-						<strong>{summary.totalFeedUsed ?? 0}</strong>
+						<strong>
+							{formatStatValue(summary.totalFeedUsed)}
+							{hasValue(summary.totalFeedUsed) ? (
+								<span className="stat-subtext"> ({formatBagsFromKg(summary.totalFeedUsed)} bags)</span>
+							) : null}
+						</strong>
 					</div>
 					<div className="stat-card">
 						<span>Feed remaining (kg)</span>
-						<strong>{summary.feedRemaining}</strong>
+						<strong>
+							{formatStatValue(summary.feedRemaining)}
+							{hasValue(summary.feedRemaining) ? (
+								<span className="stat-subtext"> ({formatBagsFromKg(summary.feedRemaining)} bags)</span>
+							) : null}
+						</strong>
+					</div>
+					<div className="stat-card">
+						<span>Total feed cost</span>
+						<strong>{formatStatValue(summary.totalFeedCost)}</strong>
+					</div>
+					<div className="stat-card">
+						<span>Total medicine cost</span>
+						<strong>{formatStatValue(summary.totalMedicineCost)}</strong>
 					</div>
 					<div className="stat-card">
 						<span>Birds sold</span>
-						<strong>{summary.totalBirdsSold}</strong>
+						<strong>{formatStatValue(summary.totalBirdsSold)}</strong>
+					</div>
+					<div className="stat-card">
+						<span>Total sold weight (kg)</span>
+						<strong>{formatStatValue(summary.totalWeightSold, { decimals: 3 })}</strong>
+					</div>
+					<div className="stat-card">
+						<span>Avg weight per bird (kg)</span>
+						<strong>
+							{formatStatValue(summary.avgWeightPerBird, { decimals: 3 })}
+						</strong>
 					</div>
 				</div>
 			)}

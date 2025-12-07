@@ -5,6 +5,14 @@ import { getTodayISO, formatIndiaDate } from "../utils/helpers";
 
 const today = getTodayISO();
 
+const createDefaultDailyForm = (dateValue = today) => ({
+	date: dateValue,
+	mortality: "",
+	feedBags: "",
+	kgPerBag: "60",
+	avgWeight: "",
+});
+
 const getRowDate = (row) => {
 	if (!row) return "";
 	if (row.date) return row.date;
@@ -18,17 +26,22 @@ const computeFeedKg = (bags, kgPerBag) => {
 	return (Math.round(total * 100) / 100).toFixed(2);
 };
 
+const formatFeedPerBird = (value) => {
+	const num = Number(value);
+	if (!Number.isFinite(num)) return "-";
+	return num.toFixed(3);
+};
+
+const formatFeedBags = (kgValue) => {
+	const num = Number(kgValue);
+	if (!Number.isFinite(num)) return "-";
+	return (num / 60).toFixed(2);
+};
+
 export default function DailyMonitoring() {
 	const { flocks } = useFlocks();
 	const [selectedBatch, setSelectedBatch] = useState("");
-	const [form, setForm] = useState({
-		date: today,
-		mortality: "0",
-		feedBags: "0",
-		kgPerBag: "0",
-		avgWeight: "0",
-		remarks: "",
-	});
+	const [form, setForm] = useState(() => createDefaultDailyForm());
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState("");
 	const [success, setSuccess] = useState("");
@@ -37,7 +50,6 @@ export default function DailyMonitoring() {
 		feedBags: "",
 		kgPerBag: "",
 		avgWeight: "",
-		remarks: "",
 	};
 	const [editingRow, setEditingRow] = useState(null);
 	const [editForm, setEditForm] = useState(emptyEditForm);
@@ -161,16 +173,14 @@ export default function DailyMonitoring() {
 				kgPerBag: Number(form.kgPerBag || 0),
 				feedKg: totalFeedKg,
 				avgWeight: Number(form.avgWeight || 0),
-				remarks: form.remarks,
 			});
 			setSuccess("Daily entry saved.");
 			setForm((prev) => ({
 				...prev,
-				mortality: "0",
-				feedBags: "0",
-				kgPerBag: "0",
-				avgWeight: "0",
-				remarks: "",
+				mortality: "",
+				feedBags: "",
+				kgPerBag: prev.kgPerBag || "60",
+				avgWeight: "",
 			}));
 			loadReport(selectedBatch);
 		} catch (err) {
@@ -189,7 +199,6 @@ export default function DailyMonitoring() {
 			feedBags: row.feedBags?.toString() || "0",
 			kgPerBag: row.kgPerBag?.toString() || "0",
 			avgWeight: row.avgWeight === null || row.avgWeight === undefined ? "0" : row.avgWeight.toString(),
-			remarks: row.remarks || "",
 		});
 		setError("");
 		setSuccess("");
@@ -221,7 +230,6 @@ export default function DailyMonitoring() {
 				kgPerBag: toNumber(editForm.kgPerBag),
 				feedKg: totalFeedKg,
 				avgWeight: toNumber(editForm.avgWeight),
-				remarks: editForm.remarks,
 			});
 			setSuccess("Daily entry updated.");
 			cancelEdit();
@@ -288,10 +296,6 @@ export default function DailyMonitoring() {
 						<span>Average weight (kg)</span>
 						<input type="number" min="0" step="0.01" name="avgWeight" value={form.avgWeight} onChange={onChange} />
 					</label>
-					<label className="grid-full">
-						<span>Remarks</span>
-						<textarea name="remarks" rows={2} value={form.remarks} onChange={onChange} />
-					</label>
 					<div className="grid-full">
 						<button type="submit" disabled={saving || dateOutOfRange || hasEntryForSelectedDate}>
 							{saving ? "Saving..." : "Save entry"}
@@ -329,10 +333,6 @@ export default function DailyMonitoring() {
 							<span>Average weight (kg)</span>
 							<input type="number" min="0" step="0.01" name="avgWeight" value={editForm.avgWeight} onChange={onEditChange} />
 						</label>
-						<label className="grid-full">
-							<span>Remarks</span>
-							<textarea name="remarks" rows={2} value={editForm.remarks} onChange={onEditChange} />
-						</label>
 						<div className="grid-full" style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
 							<button type="submit" disabled={savingEdit}>
 								{savingEdit ? "Saving..." : "Update entry"}
@@ -359,18 +359,19 @@ export default function DailyMonitoring() {
 								<th>Date</th>
 								<th>Age</th>
 								<th>Mortality</th>
-								<th>Cumulative mortality</th>
-								<th>Feed kg</th>
+								<th>C mortality</th>
+								<th>Feed bags</th>
+								<th>C feed bags</th>
 								<th>Feed/bird</th>
+								<th>C feed/bird</th>
 								<th>Avg weight</th>
-								<th>Remarks</th>
 								<th>Actions</th>
 							</tr>
 						</thead>
 						<tbody>
 							{reportRows.length === 0 && (
 								<tr>
-									<td colSpan="9" style={{ textAlign: "center" }}>
+									<td colSpan="10" style={{ textAlign: "center" }}>
 										{reportLoading ? "Loading report..." : "No records yet"}
 									</td>
 								</tr>
@@ -386,10 +387,11 @@ export default function DailyMonitoring() {
 										<td>
 											{row.cumulativeMortality} ({row.mortalityPercent}% )
 										</td>
-										<td>{row.feedKg}</td>
-										<td>{row.feedPerBird}</td>
+										<td>{formatFeedBags(row.feedKg)}</td>
+										<td>{formatFeedBags(row.cumulativeFeedKg)}</td>
+										<td>{formatFeedPerBird(row.feedPerBird)}</td>
+										<td>{formatFeedPerBird(row.cumulativeFeedPerBird)}</td>
 										<td>{row.avgWeight ?? "-"}</td>
-										<td>{row.remarks || "-"}</td>
 										<td>
 											<button type="button" className="link" onClick={() => startEdit(row)}>
 												Edit

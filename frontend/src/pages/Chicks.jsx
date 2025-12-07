@@ -6,7 +6,7 @@ const today = getTodayISO();
 
 export default function Chicks() {
   const [flocks, setFlocks] = useState([]);
-  const [form, setForm] = useState({ start_date: today, totalChicks: "", pricePerChick: "", remarks: "" });
+  const [form, setForm] = useState({ start_date: today, totalChicks: "", pricePerChick: "" });
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -68,8 +68,7 @@ export default function Chicks() {
       const payload = {
         start_date: form.start_date,
         totalChicks: Number(form.totalChicks),
-            pricePerChick: Number(form.pricePerChick),
-            remarks: form.remarks || "",
+        pricePerChick: Number(form.pricePerChick),
       };
 
       if (editingFlock) {
@@ -84,7 +83,7 @@ export default function Chicks() {
         setSuccess(`${latestLabel} created.`);
       }
 
-      setForm({ start_date: today, totalChicks: "", pricePerChick: "", remarks: "" });
+      setForm({ start_date: today, totalChicks: "", pricePerChick: "" });
     } catch (err) {
       setError(err.response?.data?.error || err.message || "Unable to save batch");
     } finally {
@@ -98,7 +97,6 @@ export default function Chicks() {
       start_date: formatIndiaDate(flock.start_date) || today,
       totalChicks: flock.totalChicks?.toString() || "",
       pricePerChick: flock.pricePerChick?.toString() || "",
-      remarks: flock.remarks || "",
     });
     setSuccess("");
     setError("");
@@ -106,7 +104,7 @@ export default function Chicks() {
 
   const cancelEdit = () => {
     setEditingFlock(null);
-    setForm({ start_date: today, totalChicks: "", pricePerChick: "", remarks: "" });
+    setForm({ start_date: today, totalChicks: "", pricePerChick: "" });
   };
 
   return (
@@ -155,15 +153,6 @@ export default function Chicks() {
               onChange={onChange}
             />
           </label>
-          <label className="grid-full">
-            <span>Remarks (optional)</span>
-            <textarea
-              name="remarks"
-              rows={3}
-              value={form.remarks}
-              onChange={onChange}
-            />
-          </label>
           <div className="grid-full" style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
             <button type="submit" disabled={submitting || (!editingFlock && hasActiveBatch)}>
               {submitting ? "Saving..." : editingFlock ? "Update batch" : "Create batch"}
@@ -195,14 +184,13 @@ export default function Chicks() {
                 <th>Total chicks</th>
                 <th>Price/chick</th>
                 <th>Status</th>
-                <th>Remarks</th>
                 <th style={{ width: "90px" }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {flocks.length === 0 && (
                 <tr>
-                  <td colSpan="5" style={{ textAlign: "center" }}>
+                  <td colSpan="6" style={{ textAlign: "center" }}>
                     {loading ? "Loading..." : "No batches yet"}
                   </td>
                 </tr>
@@ -214,7 +202,6 @@ export default function Chicks() {
                   <td>{flock.totalChicks}</td>
                   <td>{flock.pricePerChick ? flock.pricePerChick.toFixed?.(2) ?? flock.pricePerChick : "-"}</td>
                   <td>{flock.status}</td>
-                  <td>{flock.remarks || "-"}</td>
                   <td>
                     <button type="button" className="link" onClick={() => onEdit(flock)}>
                       Edit

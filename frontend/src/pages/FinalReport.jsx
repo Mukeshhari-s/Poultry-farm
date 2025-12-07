@@ -167,48 +167,6 @@ export default function FinalReport() {
 			</div>
 
 			<div className="card mt">
-				<h2>Daily performance (min 40 days recommended)</h2>
-				<div className="table-wrapper">
-					<table>
-						<thead>
-							<tr>
-								<th>Date</th>
-								<th>Age</th>
-								<th>Mortality</th>
-								<th>Cumulative %</th>
-								<th>Feed kg</th>
-								<th>Feed/bird</th>
-								<th>Birds at start</th>
-							</tr>
-						</thead>
-						<tbody>
-							{rows.length === 0 && (
-								<tr>
-									<td colSpan="7" style={{ textAlign: "center" }}>
-										{loading ? "Loading..." : "No data"}
-									</td>
-								</tr>
-							)}
-							{rows.map((row, idx) => {
-								const displayDate = formatIndiaDate(row.date || row.dateIso);
-								return (
-									<tr key={`${displayDate}-${idx}`}>
-										<td>{displayDate}</td>
-										<td>{row.age}</td>
-										<td>{row.mortality}</td>
-										<td>{row.mortalityPercent?.toFixed?.(2) ?? row.mortalityPercent}</td>
-										<td>{row.feedKg}</td>
-										<td>{row.feedPerBird?.toFixed?.(4) ?? row.feedPerBird}</td>
-										<td>{row.birdsAtStart}</td>
-									</tr>
-								);
-							})}
-						</tbody>
-					</table>
-				</div>
-			</div>
-
-			<div className="card mt">
 				<h2>Medicine summary</h2>
 				<div className="timeline">
 					{data?.medicineByDate &&

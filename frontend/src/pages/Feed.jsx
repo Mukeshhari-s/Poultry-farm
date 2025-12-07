@@ -6,6 +6,20 @@ import { createBatchLabelMap, getTodayISO, formatIndiaDate } from "../utils/help
 const today = getTodayISO();
 const FEED_TYPE_CHOICES = ["1", "2", "3", "4", "5"];
 
+const isDailyUsageLog = (log = {}) => {
+	const typeKey = (log.typeKey || "").toLowerCase();
+	const typeValue = (log.type || "").toLowerCase();
+	return Boolean(log.dailyRecord) || typeKey === "daily usage" || typeValue === "daily usage";
+};
+
+const filterFeedLogs = (logs = []) => logs.filter((log) => !isDailyUsageLog(log));
+
+const formatBagsFromKg = (kgValue) => {
+	const numeric = Number(kgValue);
+	if (!Number.isFinite(numeric)) return "-";
+	return (numeric / 60).toFixed(2);
+};
+
 const calculateAvailableFeed = (logs, flockId) => {
 	return logs.reduce((acc, log) => {
 		const logFlockId = log.flockId ? String(log.flockId) : "";
@@ -20,7 +34,7 @@ const defaultInForm = {
 	type: FEED_TYPE_CHOICES[0],
 	date: today,
 	bagsIn: "",
-	kgPerBag: "",
+	kgPerBag: "60",
 	unitPrice: "",
 	flockId: "",
 };
@@ -29,7 +43,7 @@ const defaultOutForm = {
 	type: FEED_TYPE_CHOICES[0],
 	date: today,
 	bagsOut: "",
-	kgPerBag: "",
+	kgPerBag: "60",
 	unitPrice: "",
 	flockId: "",
 };
@@ -73,6 +87,47 @@ export default function Feed() {
 		() => calculateAvailableFeed(feedLogs, feedOutForm.flockId),
 		[feedLogs, feedOutForm.flockId]
 	);
+	const cumulativeFeedStats = useMemo(() => {
+		const totals = feedLogs.reduce(
+			(acc, log) => {
+				const kgIn = Number(log.kgIn || 0);
+				const kgOut = Number(log.kgOut || 0);
+				const cost = Number(log.totalCost || 0);
+				if (kgIn > 0) {
+					acc.totalInEntries += 1;
+					acc.totalInKg += kgIn;
+					acc.totalInCost += cost;
+				}
+				if (kgOut > 0) {
+					acc.totalOutEntries += 1;
+					acc.totalOutKg += kgOut;
+					acc.totalOutCost += cost;
+				}
+				return acc;
+			},
+			{
+				totalInEntries: 0,
+				totalInKg: 0,
+				totalInCost: 0,
+				totalOutEntries: 0,
+				totalOutKg: 0,
+				totalOutCost: 0,
+			}
+		);
+		const totalInBags = totals.totalInKg / 60;
+		const totalOutBags = totals.totalOutKg / 60;
+		const netRemainingKg = totals.totalInKg - totals.totalOutKg;
+		const netRemainingBags = netRemainingKg / 60;
+		const netRemainingAmount = totals.totalInCost - totals.totalOutCost;
+		return {
+			...totals,
+			totalInBags,
+			totalOutBags,
+			netRemainingKg,
+			netRemainingBags,
+			netRemainingAmount,
+		};
+	}, [feedLogs]);
 	const feedInTotalKg = useMemo(() => {
 		const total = Number(feedInForm.bagsIn || 0) * Number(feedInForm.kgPerBag || 0);
 		if (!Number.isFinite(total)) return 0;
@@ -110,7 +165,7 @@ export default function Feed() {
 		setError("");
 		try {
 			const list = await feedApi.list(flockId ? { flockId } : {});
-			setFeedLogs(list);
+			setFeedLogs(filterFeedLogs(list));
 		} catch (err) {
 			setError(err.response?.data?.error || err.message || "Unable to load feed records");
 		} finally {
@@ -667,9 +722,10 @@ export default function Feed() {
 								<th>Type</th>
 								<th>Bags in</th>
 								<th>Bags out</th>
-								<th>Kg/bag</th>
 								<th>Kg in</th>
 								<th>Kg out</th>
+								<th>Bags in (kg/60)</th>
+								<th>Bags out (kg/60)</th>
 								<th>Unit price</th>
 								<th>Total cost</th>
 								<th>Batch</th>
@@ -690,27 +746,20 @@ export default function Feed() {
 									: log.flockId
 									? batchLabelMap[log.flockId] || log.flockId
 									: "-";
-								const numericPerBag = log.kgPerBag
-									? Number(log.kgPerBag)
-									: log.bagsIn
-									? Number(log.kgIn || 0) / Number(log.bagsIn || 1)
-									: log.bagsOut
-									? Number(log.kgOut || 0) / Number(log.bagsOut || 1)
-									: null;
-								const perBagDisplay = numericPerBag && Number.isFinite(numericPerBag)
-									? numericPerBag.toFixed(2)
-									: "-";
 								const unitPriceDisplay = log.unitPrice ? Number(log.unitPrice).toFixed(2) : "-";
 								const totalCostDisplay = log.totalCost ? Number(log.totalCost).toFixed(2) : "-";
+								const derivedBagsIn = formatBagsFromKg(log.kgIn);
+								const derivedBagsOut = formatBagsFromKg(log.kgOut);
 								return (
 									<tr key={log._id}>
 										<td>{formatIndiaDate(log.date)}</td>
 										<td>{log.type}</td>
 										<td>{log.bagsIn || "-"}</td>
 										<td>{log.bagsOut || "-"}</td>
-										<td>{perBagDisplay}</td>
 										<td>{log.kgIn || "-"}</td>
 										<td>{log.kgOut || "-"}</td>
+										<td>{derivedBagsIn}</td>
+										<td>{derivedBagsOut}</td>
 										<td>{unitPriceDisplay}</td>
 										<td>{totalCostDisplay}</td>
 										<td>{batchLabel || "-"}</td>
@@ -724,6 +773,42 @@ export default function Feed() {
 							})}
 						</tbody>
 					</table>
+				</div>
+			</div>
+
+			<div className="card mt">
+				<h2>Cumulative feed summary</h2>
+				<div className="table-wrapper">
+					<table>
+						<thead>
+							<tr>
+								<th>Type</th>
+								<th>Total entries</th>
+								<th>Total kg</th>
+								<th>Total bags (kg/60)</th>
+								<th>Total amount</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td>Feed in</td>
+								<td>{cumulativeFeedStats.totalInEntries}</td>
+								<td>{cumulativeFeedStats.totalInKg.toFixed(2)}</td>
+								<td>{cumulativeFeedStats.totalInBags.toFixed(2)}</td>
+								<td>{cumulativeFeedStats.totalInCost.toFixed(2)}</td>
+							</tr>
+							<tr>
+								<td>Feed out</td>
+								<td>{cumulativeFeedStats.totalOutEntries}</td>
+								<td>{cumulativeFeedStats.totalOutKg.toFixed(2)}</td>
+								<td>{cumulativeFeedStats.totalOutBags.toFixed(2)}</td>
+								<td>{cumulativeFeedStats.totalOutCost.toFixed(2)}</td>
+							</tr>
+						</tbody>
+					</table>
+					<div className="stat-note" style={{ marginTop: "0.75rem", fontSize: "0.95rem" }}>
+						Net remaining: {cumulativeFeedStats.netRemainingKg.toFixed(2)} kg ({cumulativeFeedStats.netRemainingBags.toFixed(2)} bags) · Net amount: {cumulativeFeedStats.netRemainingAmount.toFixed(2)}
+					</div>
 				</div>
 			</div>
 		</div>
