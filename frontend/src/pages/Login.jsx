@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import EyeToggleIcon from "../components/EyeToggleIcon";
 
 export default function Login() {
   const navigate = useNavigate();
   const { loginUser, loading } = useAuth();
   const [form, setForm] = useState({ identifier: "", password: "" });
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -51,12 +53,23 @@ export default function Login() {
         </label>
         <label>
           <span>Password</span>
-          <input
-            name="password"
-            value={form.password}
-            onChange={onChange}
-            type="password"
-          />
+          <div className="password-field">
+            <input
+              name="password"
+              value={form.password}
+              onChange={onChange}
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+            />
+            <button
+              type="button"
+              className="password-icon"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              onClick={() => setShowPassword((prev) => !prev)}
+            >
+              <EyeToggleIcon visible={showPassword} />
+            </button>
+          </div>
         </label>
         <button type="submit" disabled={loading}>
           {loading ? "Signing in..." : "Login"}

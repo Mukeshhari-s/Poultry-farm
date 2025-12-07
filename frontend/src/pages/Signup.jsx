@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import EyeToggleIcon from "../components/EyeToggleIcon";
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -13,6 +14,8 @@ export default function Signup() {
     confirmPassword: "",
   });
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -77,25 +80,47 @@ export default function Signup() {
         </label>
         <label>
           <span>Password</span>
-          <input
-            name="password"
-            type="password"
-            minLength={6}
-            value={form.password}
-            onChange={onChange}
-            required
-          />
+          <div className="password-field">
+            <input
+              name="password"
+              type={showPassword ? "text" : "password"}
+              minLength={6}
+              value={form.password}
+              onChange={onChange}
+              required
+              autoComplete="new-password"
+            />
+            <button
+              type="button"
+              className="password-icon"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              onClick={() => setShowPassword((prev) => !prev)}
+            >
+              <EyeToggleIcon visible={showPassword} />
+            </button>
+          </div>
         </label>
         <label>
           <span>Confirm password</span>
-          <input
-            name="confirmPassword"
-            type="password"
-            minLength={6}
-            value={form.confirmPassword}
-            onChange={onChange}
-            required
-          />
+          <div className="password-field">
+            <input
+              name="confirmPassword"
+              type={showConfirm ? "text" : "password"}
+              minLength={6}
+              value={form.confirmPassword}
+              onChange={onChange}
+              required
+              autoComplete="new-password"
+            />
+            <button
+              type="button"
+              className="password-icon"
+              aria-label={showConfirm ? "Hide password" : "Show password"}
+              onClick={() => setShowConfirm((prev) => !prev)}
+            >
+              <EyeToggleIcon visible={showConfirm} />
+            </button>
+          </div>
         </label>
         <button type="submit" disabled={loading}>
           {loading ? "Creating..." : "Sign up"}
