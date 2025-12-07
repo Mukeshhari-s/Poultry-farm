@@ -20,6 +20,12 @@ const formatStatValue = (value, options = {}) => {
 	return num;
 };
 
+const formatFeedPerBird = (value) => {
+	const num = Number(value);
+	if (!Number.isFinite(num)) return "-";
+	return num.toFixed(3);
+};
+
 export default function CurrentReport() {
 	const { flocks } = useFlocks();
 	const batchOptions = flocks.map((f) => ({
@@ -92,7 +98,7 @@ export default function CurrentReport() {
 						<strong>{formatStatValue(summary.remainingChicks)}</strong>
 					</div>
 					<div className="stat-card">
-						<span>Cumulative mortality</span>
+						<span>Cum mort</span>
 						<strong>
 							{formatStatValue(summary.cumulativeMortality)} ({formatStatValue(summary.cumulativeMortalityPercent)}% )
 						</strong>
@@ -102,11 +108,13 @@ export default function CurrentReport() {
 						<strong>{formatStatValue(summary.totalChickCost)}</strong>
 					</div>
 					<div className="stat-card">
-						<span>Feed in (kg)</span>
+						<span>Feed in (bags)</span>
 						<strong>
-							{formatStatValue(summary.totalFeedIn)}
+							{hasValue(summary.totalFeedIn)
+								? formatStatValue(formatBagsFromKg(summary.totalFeedIn))
+								: "-"}
 							{hasValue(summary.totalFeedIn) ? (
-								<span className="stat-subtext"> ({formatBagsFromKg(summary.totalFeedIn)} bags)</span>
+								<span className="stat-subtext"> ({formatStatValue(summary.totalFeedIn)} kg)</span>
 							) : null}
 						</strong>
 					</div>
@@ -172,16 +180,15 @@ export default function CurrentReport() {
 								<th>Age</th>
 								<th>Mortality</th>
 								<th>Mortality %</th>
-								<th>Feed kg</th>
+								<th>Feed bags</th>
 								<th>Feed/bird</th>
 								<th>Avg weight</th>
-								<th>Remarks</th>
 							</tr>
 						</thead>
 						<tbody>
 							{rows.length === 0 && (
 								<tr>
-									<td colSpan="8" style={{ textAlign: "center" }}>
+									<td colSpan="7" style={{ textAlign: "center" }}>
 										{loading ? "Loading..." : "No daily data"}
 									</td>
 								</tr>
@@ -197,10 +204,13 @@ export default function CurrentReport() {
 									<td>
 										{row.cumulativeMortality} ({row.mortalityPercent}% )
 									</td>
-									<td>{row.feedKg}</td>
-									<td>{row.feedPerBird}</td>
+									<td>
+										{hasValue(row.feedKg)
+											? `${formatBagsFromKg(row.feedKg)} bags (${formatStatValue(row.feedKg, { decimals: 2 })} kg)`
+											: "-"}
+									</td>
+									<td>{formatFeedPerBird(row.feedPerBird)}</td>
 									<td>{row.avgWeight ?? "-"}</td>
-									<td>{row.remarks || "-"}</td>
 									</tr>
 								);
 							})}

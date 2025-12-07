@@ -5,6 +5,7 @@ import { createBatchLabelMap, getTodayISO, formatIndiaDate } from "../utils/help
 
 const today = getTodayISO();
 const FEED_TYPE_CHOICES = ["1", "2", "3", "4", "5"];
+const DEFAULT_KG_PER_BAG = 60;
 
 const isDailyUsageLog = (log = {}) => {
 	const typeKey = (log.typeKey || "").toLowerCase();
@@ -17,7 +18,7 @@ const filterFeedLogs = (logs = []) => logs.filter((log) => !isDailyUsageLog(log)
 const formatBagsFromKg = (kgValue) => {
 	const numeric = Number(kgValue);
 	if (!Number.isFinite(numeric)) return "-";
-	return (numeric / 60).toFixed(2);
+	return (numeric / DEFAULT_KG_PER_BAG).toFixed(2);
 };
 
 const calculateAvailableFeed = (logs, flockId) => {
@@ -114,18 +115,14 @@ export default function Feed() {
 				totalOutCost: 0,
 			}
 		);
-		const totalInBags = totals.totalInKg / 60;
-		const totalOutBags = totals.totalOutKg / 60;
-		const netRemainingKg = totals.totalInKg - totals.totalOutKg;
-		const netRemainingBags = netRemainingKg / 60;
-		const netRemainingAmount = totals.totalInCost - totals.totalOutCost;
+		const totalInBags = totals.totalInKg / DEFAULT_KG_PER_BAG;
+		const totalOutBags = totals.totalOutKg / DEFAULT_KG_PER_BAG;
+		const totalAmountDiff = totals.totalInCost - totals.totalOutCost;
 		return {
 			...totals,
 			totalInBags,
 			totalOutBags,
-			netRemainingKg,
-			netRemainingBags,
-			netRemainingAmount,
+			totalAmountDiff,
 		};
 	}, [feedLogs]);
 	const feedInTotalKg = useMemo(() => {
@@ -133,6 +130,11 @@ export default function Feed() {
 		if (!Number.isFinite(total)) return 0;
 		return Math.round(total * 100) / 100;
 	}, [feedInForm.bagsIn, feedInForm.kgPerBag]);
+	const feedInTotalBagsDisplay = useMemo(() => {
+		const bags = Number(feedInForm.bagsIn || 0);
+		if (!Number.isFinite(bags)) return "0.00";
+		return bags.toFixed(2);
+	}, [feedInForm.bagsIn]);
 	const feedInTotalCost = useMemo(() => {
 		const cost = feedInTotalKg * Number(feedInForm.unitPrice || 0);
 		if (!Number.isFinite(cost) || cost <= 0) return 0;
@@ -143,6 +145,11 @@ export default function Feed() {
 		if (!Number.isFinite(total)) return 0;
 		return Math.round(total * 100) / 100;
 	}, [feedOutForm.bagsOut, feedOutForm.kgPerBag]);
+	const feedOutTotalBagsDisplay = useMemo(() => {
+		const bags = Number(feedOutForm.bagsOut || 0);
+		if (!Number.isFinite(bags)) return "0.00";
+		return bags.toFixed(2);
+	}, [feedOutForm.bagsOut]);
 	const feedOutTotalCost = useMemo(() => {
 		const cost = feedOutTotalKg * Number(feedOutForm.unitPrice || 0);
 		if (!Number.isFinite(cost) || cost <= 0) return 0;
@@ -159,6 +166,16 @@ export default function Feed() {
 		if (!Number.isFinite(cost) || cost <= 0) return 0;
 		return Math.round(cost * 100) / 100;
 	}, [editFeedTotalKg, editFeedForm.unitPrice]);
+	const editFeedTotalBagsDisplay = useMemo(() => {
+		const bagsValue = editFeedForm.entryType === "out" ? Number(editFeedForm.bagsOut || 0) : Number(editFeedForm.bagsIn || 0);
+		if (!Number.isFinite(bagsValue)) return "0.00";
+		return bagsValue.toFixed(2);
+	}, [editFeedForm.entryType, editFeedForm.bagsIn, editFeedForm.bagsOut]);
+	const feedOutAvailableBagsDisplay = useMemo(() => {
+		const perBag = Number(feedOutForm.kgPerBag || DEFAULT_KG_PER_BAG);
+		if (!Number.isFinite(perBag) || perBag <= 0) return "0.00";
+		return (Math.max(feedOutAvailable, 0) / perBag).toFixed(2);
+	}, [feedOutAvailable, feedOutForm.kgPerBag]);
 
 	const fetchFeed = async (flockId = "") => {
 		setLoading(true);
@@ -483,7 +500,7 @@ export default function Feed() {
 									/>
 								</label>
 								<div className="grid-full" style={{ fontSize: "0.9rem", color: "var(--text-muted, #555)" }}>
-									Total feed this entry: {editFeedTotalKg.toFixed(2)} kg · Cost: {editFeedTotalCost.toFixed(2)}
+									Total feed this entry: {editFeedTotalBagsDisplay} bags ({editFeedTotalKg.toFixed(2)} kg) · Cost: {editFeedTotalCost.toFixed(2)}
 								</div>
 							</>
 						) : (
@@ -518,7 +535,7 @@ export default function Feed() {
 									/>
 								</label>
 								<div className="grid-full" style={{ fontSize: "0.9rem", color: "var(--text-muted, #555)" }}>
-									Total feed this entry: {editFeedTotalKg.toFixed(2)} kg · Cost: {editFeedTotalCost.toFixed(2)}
+									Total feed this entry: {editFeedTotalBagsDisplay} bags ({editFeedTotalKg.toFixed(2)} kg) · Cost: {editFeedTotalCost.toFixed(2)}
 								</div>
 							</>
 						)}
@@ -613,7 +630,7 @@ export default function Feed() {
 							/>
 						</label>
 						<div className="grid-full" style={{ fontSize: "0.9rem", color: "var(--text-muted, #555)" }}>
-							Total feed this entry: {feedInTotalKg.toFixed(2)} kg · Cost: {feedInTotalCost.toFixed(2)}
+							Total feed this entry: {feedInTotalBagsDisplay} bags ({feedInTotalKg.toFixed(2)} kg) · Cost: {feedInTotalCost.toFixed(2)}
 						</div>
 						<div className="grid-full">
 							<button type="submit" disabled={savingIn}>
@@ -701,7 +718,7 @@ export default function Feed() {
 							/>
 						</label>
 						<div className="grid-full" style={{ fontSize: "0.9rem", color: "var(--text-muted, #555)" }}>
-							Total feed this entry: {feedOutTotalKg.toFixed(2)} kg · Cost: {feedOutTotalCost.toFixed(2)} · Available: {Math.max(feedOutAvailable, 0).toFixed(2)} kg
+							Total feed this entry: {feedOutTotalBagsDisplay} bags ({feedOutTotalKg.toFixed(2)} kg) · Cost: {feedOutTotalCost.toFixed(2)} · Available: {feedOutAvailableBagsDisplay} bags ({Math.max(feedOutAvailable, 0).toFixed(2)} kg)
 						</div>
 						<div className="grid-full">
 							<button type="submit" disabled={savingOut}>
@@ -785,7 +802,7 @@ export default function Feed() {
 								<th>Type</th>
 								<th>Total entries</th>
 								<th>Total kg</th>
-								<th>Total bags (kg/60)</th>
+								<th>Total bags</th>
 								<th>Total amount</th>
 							</tr>
 						</thead>
@@ -804,11 +821,15 @@ export default function Feed() {
 								<td>{cumulativeFeedStats.totalOutBags.toFixed(2)}</td>
 								<td>{cumulativeFeedStats.totalOutCost.toFixed(2)}</td>
 							</tr>
+							<tr>
+								<td>Net amount (in - out)</td>
+								<td>-</td>
+								<td>-</td>
+								<td>-</td>
+								<td>{cumulativeFeedStats.totalAmountDiff.toFixed(2)}</td>
+							</tr>
 						</tbody>
 					</table>
-					<div className="stat-note" style={{ marginTop: "0.75rem", fontSize: "0.95rem" }}>
-						Net remaining: {cumulativeFeedStats.netRemainingKg.toFixed(2)} kg ({cumulativeFeedStats.netRemainingBags.toFixed(2)} bags) · Net amount: {cumulativeFeedStats.netRemainingAmount.toFixed(2)}
-					</div>
 				</div>
 			</div>
 		</div>

@@ -3,6 +3,20 @@ import useFlocks from "../hooks/useFlocks";
 import { reportApi } from "../services/api";
 import { Link } from "react-router-dom";
 
+const formatBagsFromKg = (kgValue) => {
+  const num = Number(kgValue);
+  if (!Number.isFinite(num)) return null;
+  return (num / 60).toFixed(2);
+};
+
+const hasValue = (value) => value !== null && value !== undefined && !Number.isNaN(Number(value));
+
+const formatFeedPerBird = (value) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "-";
+  return num.toFixed(3);
+};
+
 export default function Dashboard() {
   const { flocks } = useFlocks();
   const [currentReport, setCurrentReport] = useState(null);
@@ -50,7 +64,7 @@ export default function Dashboard() {
           <strong>{summary?.remainingChicks ?? "-"}</strong>
         </div>
         <div className="stat-card">
-          <span>Cumulative mortality</span>
+          <span>Cum mort</span>
           <strong>
             {summary?.cumulativeMortality ?? "-"} ({summary?.cumulativeMortalityPercent ?? "-"}%)
           </strong>
@@ -84,11 +98,16 @@ export default function Dashboard() {
             </div>
             <div className="stat-card">
               <span>Feed kg</span>
-              <strong>{latestRow.feedKg}</strong>
+              <strong>
+                {hasValue(latestRow.feedKg) ? Number(latestRow.feedKg).toFixed(2) : "-"}
+                {hasValue(latestRow.feedKg) ? (
+                  <span className="stat-subtext"> ({formatBagsFromKg(latestRow.feedKg)} bags)</span>
+                ) : null}
+              </strong>
             </div>
             <div className="stat-card">
               <span>Feed per bird</span>
-              <strong>{latestRow.feedPerBird}</strong>
+              <strong>{formatFeedPerBird(latestRow.feedPerBird)}</strong>
             </div>
             <div className="stat-card">
               <span>Average weight</span>

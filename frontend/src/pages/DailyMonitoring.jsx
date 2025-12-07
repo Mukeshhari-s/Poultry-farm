@@ -359,11 +359,11 @@ export default function DailyMonitoring() {
 								<th>Date</th>
 								<th>Age</th>
 								<th>Mortality</th>
-								<th>C mortality</th>
+								<th>Cum mort</th>
 								<th>Feed bags</th>
-								<th>C feed bags</th>
+								<th>Cum feed bags</th>
 								<th>Feed/bird</th>
-								<th>C feed/bird</th>
+								<th>Cum feed/bird</th>
 								<th>Avg weight</th>
 								<th>Actions</th>
 							</tr>

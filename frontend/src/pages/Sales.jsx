@@ -13,7 +13,6 @@ const emptySaleForm = () => ({
 	total_weight: "",
 	empty_weight: "",
 	load_weight: "",
-	remarks: "",
 });
 
 const computeNetWeight = (load, empty) => {
@@ -147,7 +146,6 @@ export default function Sales() {
 				empty_weight: emptyWeightValue,
 				load_weight: loadWeightValue,
 				total_weight: netWeightValue,
-				remarks: form.remarks,
 			});
 			setSuccess("Sale recorded.");
 			setForm(emptySaleForm());
@@ -187,7 +185,6 @@ export default function Sales() {
 			empty_weight: emptyFieldValue,
 			load_weight: loadFieldValue,
 			total_weight: netWeightDisplay,
-			remarks: sale.remarks || "",
 		});
 		setError("");
 		setSuccess("");
@@ -240,7 +237,6 @@ export default function Sales() {
 				empty_weight: emptyWeightValue,
 				load_weight: loadWeightValue,
 				total_weight: netWeightValue,
-				remarks: editForm.remarks,
 			});
 			setSuccess("Sale entry updated.");
 			const batchNo = selectedBatch || editingSale.batch_no;
@@ -346,10 +342,6 @@ export default function Sales() {
 							readOnly
 						/>
 					</label>
-					<label className="grid-full">
-						<span>Remarks</span>
-						<textarea name="remarks" rows={2} value={form.remarks} onChange={onChange} />
-					</label>
 					<div className="grid-full">
 						<button type="submit" disabled={saving}>
 							{saving ? "Saving..." : "Save sale"}
@@ -414,10 +406,6 @@ export default function Sales() {
 								readOnly
 							/>
 						</label>
-						<label className="grid-full">
-							<span>Remarks</span>
-							<textarea name="remarks" rows={2} value={editForm.remarks} onChange={onEditChange} />
-						</label>
 						<div className="grid-full" style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
 							<button type="submit" disabled={savingEdit}>
 								{savingEdit ? "Saving..." : "Update sale"}
@@ -442,14 +430,13 @@ export default function Sales() {
 								<th>Birds</th>
 								<th>Weight (kg)</th>
 								<th>Avg weight/bird (kg)</th>
-								<th>Remarks</th>
 								<th>Actions</th>
 							</tr>
 						</thead>
 						<tbody>
 							{records.length === 0 && (
 								<tr>
-									<td colSpan="8" style={{ textAlign: "center" }}>
+									<td colSpan="7" style={{ textAlign: "center" }}>
 										{loading ? "Loading..." : "No sale entries"}
 									</td>
 								</tr>
@@ -466,7 +453,6 @@ export default function Sales() {
 										<td>{sale.birds}</td>
 										<td>{sale.total_weight}</td>
 										<td>{avgWeight ? avgWeight.toFixed(3) : "-"}</td>
-										<td>{sale.remarks || "-"}</td>
 										<td>
 											<button type="button" className="link" onClick={() => startEdit(sale)}>
 												Edit
