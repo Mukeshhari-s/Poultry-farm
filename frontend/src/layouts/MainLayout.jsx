@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
@@ -15,10 +15,15 @@ const links = [
 
 export default function MainLayout() {
   const { user, logout } = useAuth();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  const toggleMobileNav = () => setMobileNavOpen((prev) => !prev);
+  const closeMobileNav = () => setMobileNavOpen(false);
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
+    <>
+      <div className="app-shell">
+        <aside className="sidebar">
         <div className="brand">Poultry Manager</div>
         <nav>
           {links.map((link) => (
@@ -33,24 +38,58 @@ export default function MainLayout() {
             </NavLink>
           ))}
         </nav>
-      </aside>
-      <div className="content-area">
-        <header className="topbar">
-          <div className="spacer" />
-          <div className="header-actions">
-            <Link to="/final-report" className="ghost">
-              Farm closing report
-            </Link>
-            <span className="user-name">{user?.name}</span>
-            <button onClick={logout} className="ghost">
-              Logout
+        </aside>
+        <div className="content-area">
+          <header className="topbar">
+            <button
+              type="button"
+              className="mobile-nav-toggle"
+              onClick={toggleMobileNav}
+            >
+              Menu
             </button>
-          </div>
-        </header>
-        <main>
-          <Outlet />
-        </main>
+            <div className="spacer" />
+            <div className="header-actions">
+              <Link to="/final-report" className="ghost">
+                Farm closing report
+              </Link>
+              <span className="user-name">{user?.name}</span>
+              <button onClick={logout} className="ghost">
+                Logout
+              </button>
+            </div>
+          </header>
+          <main>
+            <Outlet />
+          </main>
+        </div>
       </div>
-    </div>
+      <div className={`mobile-nav ${mobileNavOpen ? "open" : ""}`}>
+        <div className="mobile-nav__header">
+          <div className="brand">Poultry Manager</div>
+          <button type="button" className="ghost" onClick={closeMobileNav}>
+            Close
+          </button>
+        </div>
+        <nav>
+          {links.map((link) => (
+            <NavLink
+              key={`mobile-${link.to}`}
+              to={link.to}
+              className={({ isActive }) =>
+                isActive ? "nav-link active" : "nav-link"
+              }
+              onClick={closeMobileNav}
+            >
+              {link.label}
+            </NavLink>
+          ))}
+        </nav>
+      </div>
+      <div
+        className={`mobile-nav-backdrop ${mobileNavOpen ? "show" : ""}`}
+        onClick={closeMobileNav}
+      />
+    </>
   );
 }

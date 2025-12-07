@@ -38,6 +38,13 @@ button {
   transition: background 0.2s ease;
 }
 
+.mobile-nav-toggle {
+  display: none;
+  border-color: #cbd5f5;
+  background: #fff;
+  color: #0f172a;
+}
+
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -379,6 +386,61 @@ th {
   padding: 0;
 }
 
+.mobile-nav {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: min(320px, 80%);
+  background: #fff;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 1001;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
+  pointer-events: none;
+}
+
+.mobile-nav.open {
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.mobile-nav__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.mobile-nav .nav-link {
+  color: #0f172a;
+  background: #f8fafc;
+  margin: 0.2rem 0;
+  display: block;
+}
+
+.mobile-nav .nav-link.active {
+  background: #e0e7ff;
+  color: #1d4ed8;
+}
+
+.mobile-nav-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 1000;
+}
+
+.mobile-nav-backdrop.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.2em;
@@ -429,6 +491,11 @@ th {
   }
   .topbar {
     justify-content: space-between;
+  }
+  .mobile-nav-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
   }
 }
 
