@@ -5,10 +5,15 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
+const validator = require('validator');
 const User = require('../models/User');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES = process.env.JWT_EXPIRES || '1h';
+
+const normalizeEmail = (value = '') => value.toLowerCase().trim();
+const normalizeMobile = (value = '') => value.replace(/\D/g, '');
+const isValidMobile = (value = '') => /^\d{7,15}$/.test(value);
 
 // rate limiter for auth
 const authLimiter = rateLimit({
@@ -20,18 +25,41 @@ const authLimiter = rateLimit({
 // -------------------- REGISTER --------------------
 router.post('/register', authLimiter, async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, mobile, password, role } = req.body;
 
-    if (!name || !email || !password)
-      return res.status(400).json({ error: 'name, email and password required' });
+    if (!name || !email || !mobile || !password)
+      return res.status(400).json({ error: 'name, email, mobile and password required' });
 
-    const existing = await User.findOne({ email });
-    if (existing) return res.status(409).json({ error: 'Email already registered' });
+    const normalizedEmail = normalizeEmail(email);
+    const normalizedMobile = normalizeMobile(mobile);
+
+    if (!validator.isEmail(normalizedEmail)) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+
+    if (!isValidMobile(normalizedMobile)) {
+      return res.status(400).json({ error: 'Invalid mobile number' });
+    }
+
+    const existing = await User.findOne({
+      $or: [{ email: normalizedEmail }, { mobile: normalizedMobile }]
+    });
+
+    if (existing) {
+      if (existing.email === normalizedEmail) {
+        return res.status(409).json({ error: 'Email already registered' });
+      }
+      if (existing.mobile === normalizedMobile) {
+        return res.status(409).json({ error: 'Mobile number already registered' });
+      }
+      return res.status(409).json({ error: 'User already exists' });
+    }
 
     const user = new User({
       name,
-      email: email.toLowerCase().trim(),
-      password, // auto-hashed by pre('save')
+      email: normalizedEmail,
+      mobile: normalizedMobile,
+      password,
       role
     });
 
@@ -54,12 +82,27 @@ router.post('/register', authLimiter, async (req, res) => {
 // -------------------- LOGIN --------------------
 router.post('/login', authLimiter, async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { identifier, email, mobile, password } = req.body;
+    const candidates = [identifier, email, mobile]
+      .map((value) => (value ?? '').toString().trim())
+      .filter((value) => value.length > 0);
+    const credential = candidates[0] || '';
 
-    if (!email || !password)
-      return res.status(400).json({ error: 'email and password required' });
+    if (!credential || !password)
+      return res.status(400).json({ error: 'login identifier and password required' });
 
-    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    let query;
+    if (validator.isEmail(credential)) {
+      query = { email: normalizeEmail(credential) };
+    } else {
+      const normalizedMobile = normalizeMobile(credential);
+      if (!isValidMobile(normalizedMobile)) {
+        return res.status(400).json({ error: 'Invalid email or mobile number' });
+      }
+      query = { mobile: normalizedMobile };
+    }
+
+    const user = await User.findOne(query);
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
     const ok = await user.comparePassword(password);
@@ -81,7 +124,7 @@ router.post('/forgot', async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ error: "Email is required" });
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizeEmail(email) });
     if (!user) {
       // security: don't reveal if user exists
       return res.json({ message: "If email exists, reset link sent" });

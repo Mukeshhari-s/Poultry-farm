@@ -8,6 +8,7 @@ export default function Signup() {
   const [form, setForm] = useState({
     name: "",
     email: "",
+    mobile: "",
     password: "",
     confirmPassword: "",
   });
@@ -18,8 +19,12 @@ export default function Signup() {
   const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!form.name || !form.email || !form.password) {
+    if (!form.name || !form.email || !form.mobile || !form.password) {
       setError("All fields are required.");
+      return;
+    }
+    if (!/^\d{7,15}$/.test(form.mobile.replace(/\D/g, ""))) {
+      setError("Enter a valid mobile number (7-15 digits).");
       return;
     }
     if (form.password.length < 6) {
@@ -34,6 +39,7 @@ export default function Signup() {
     const res = await signupUser({
       name: form.name,
       email: form.email,
+      mobile: form.mobile,
       password: form.password,
     });
 
@@ -57,6 +63,17 @@ export default function Signup() {
         <label>
           <span>Email</span>
           <input name="email" type="email" value={form.email} onChange={onChange} />
+        </label>
+        <label>
+          <span>Mobile number</span>
+          <input
+            name="mobile"
+            type="tel"
+            inputMode="tel"
+            value={form.mobile}
+            onChange={onChange}
+            placeholder="e.g. 9876543210"
+          />
         </label>
         <label>
           <span>Password</span>

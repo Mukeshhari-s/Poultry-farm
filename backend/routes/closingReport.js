@@ -105,6 +105,7 @@ router.get('/', async (req, res) => {
     const sales = await Sale.find(saleQuery).lean();
     const totalBirdsSold = sales.reduce((s, x) => s + safeNum(x.birds || x.count || x.qty), 0);
     const totalWeightSold = sales.reduce((s, x) => s + safeNum(x.weight || x.total_weight || 0), 0);
+    const avgWeightPerBird = totalBirdsSold > 0 ? totalWeightSold / totalBirdsSold : 0;
 
     // Final summary
     const lastCumulativeMort = cumulativeMort;
@@ -123,6 +124,7 @@ router.get('/', async (req, res) => {
       feedCostRemaining,
       totalBirdsSold,
       totalWeightSold,
+      avgWeightPerBird,
       totalMedicineCost,
       rows,
       medicineByDate,

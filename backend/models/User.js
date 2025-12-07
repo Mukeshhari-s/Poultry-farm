@@ -25,6 +25,19 @@ const UserSchema = new mongoose.Schema({
     }
   },
 
+  mobile: {
+    type: String,
+    required: true,
+    unique: true,
+    sparse: true,
+    trim: true,
+    set: v => (v ? v.replace(/\D/g, '') : v),
+    validate: {
+      validator: v => /^\d{7,15}$/.test(v),
+      message: 'Invalid mobile number'
+    }
+  },
+
   password: {
     type: String,
     required: true,

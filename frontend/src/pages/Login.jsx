@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 export default function Login() {
   const navigate = useNavigate();
   const { loginUser, loading } = useAuth();
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({ identifier: "", password: "" });
   const [error, setError] = useState("");
 
   const onChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
@@ -13,12 +13,20 @@ export default function Login() {
   const onSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!form.email || !form.password) {
-      setError("Email and password required.");
+    if (!form.identifier || !form.password) {
+      setError("Email/mobile and password required.");
       return;
     }
 
-    const res = await loginUser({ email: form.email, password: form.password });
+    const trimmed = form.identifier.trim();
+    const payload = { identifier: trimmed, password: form.password };
+    if (trimmed.includes("@")) {
+      payload.email = trimmed;
+    } else {
+      payload.mobile = trimmed.replace(/\D/g, "");
+    }
+
+    const res = await loginUser(payload);
     if (!res.ok) {
       setError(res.message || "Login failed");
       return;
@@ -32,8 +40,14 @@ export default function Login() {
       {error && <div className="error">{error}</div>}
       <form onSubmit={onSubmit} className="form-grid">
         <label>
-          <span>Email</span>
-          <input name="email" value={form.email} onChange={onChange} type="email" />
+          <span>Email or mobile number</span>
+          <input
+            name="identifier"
+            value={form.identifier}
+            onChange={onChange}
+            type="text"
+            autoComplete="username"
+          />
         </label>
         <label>
           <span>Password</span>

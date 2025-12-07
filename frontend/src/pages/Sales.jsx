@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import useFlocks from "../hooks/useFlocks";
 import { salesApi } from "../services/api";
 import { getTodayISO, formatIndiaDate } from "../utils/helpers";
@@ -38,14 +38,26 @@ export default function Sales() {
 	const [editForm, setEditForm] = useState(emptySaleForm);
 	const [savingEdit, setSavingEdit] = useState(false);
 
+	const saleStats = useMemo(() => {
+		if (!records.length) {
+			return { totalBirds: 0, totalWeight: 0, avgPerBird: 0 };
+		}
+		const totalBirds = records.reduce((sum, sale) => sum + Number(sale.birds || 0), 0);
+		const totalWeight = records.reduce((sum, sale) => sum + Number(sale.total_weight || 0), 0);
+		const avgPerBird = totalBirds > 0 ? totalWeight / totalBirds : 0;
+		return { totalBirds, totalWeight, avgPerBird };
+	}, [records]);
+
 	const fetchSales = async (batch_no) => {
 		if (!batch_no) return;
 		setLoading(true);
 		setError("");
 		try {
-			const list = await salesApi.list({ batch_no });
+			const [list, stats] = await Promise.all([
+				salesApi.list({ batch_no }),
+				salesApi.remaining(batch_no),
+			]);
 			setRecords(list);
-			const stats = await salesApi.remaining(batch_no);
 			setSummary(stats);
 		} catch (err) {
 			setError(err.response?.data?.error || err.message || "Unable to load sales data");
@@ -420,6 +432,7 @@ export default function Sales() {
 								<th>Cages</th>
 								<th>Birds</th>
 								<th>Weight (kg)</th>
+								<th>Avg weight/bird (kg)</th>
 								<th>Remarks</th>
 								<th>Actions</th>
 							</tr>
@@ -427,28 +440,48 @@ export default function Sales() {
 						<tbody>
 							{records.length === 0 && (
 								<tr>
-									<td colSpan="7" style={{ textAlign: "center" }}>
+									<td colSpan="8" style={{ textAlign: "center" }}>
 										{loading ? "Loading..." : "No sale entries"}
 									</td>
 								</tr>
 							)}
-							{records.map((sale) => (
-								<tr key={sale._id}>
-									<td>{formatIndiaDate(sale.date)}</td>
-									<td>{sale.vehicle_no || "-"}</td>
-									<td>{sale.cages}</td>
-									<td>{sale.birds}</td>
-									<td>{sale.total_weight}</td>
-									<td>{sale.remarks || "-"}</td>
-									<td>
-										<button type="button" className="link" onClick={() => startEdit(sale)}>
-											Edit
-										</button>
-									</td>
-								</tr>
-							))}
+							{records.map((sale) => {
+								const avgWeight = Number(sale.birds) > 0
+									? Number(sale.total_weight || 0) / Number(sale.birds || 1)
+									: 0;
+								return (
+									<tr key={sale._id}>
+										<td>{formatIndiaDate(sale.date)}</td>
+										<td>{sale.vehicle_no || "-"}</td>
+										<td>{sale.cages}</td>
+										<td>{sale.birds}</td>
+										<td>{sale.total_weight}</td>
+										<td>{avgWeight ? avgWeight.toFixed(3) : "-"}</td>
+										<td>{sale.remarks || "-"}</td>
+										<td>
+											<button type="button" className="link" onClick={() => startEdit(sale)}>
+												Edit
+											</button>
+										</td>
+									</tr>
+								);
+							})}
 						</tbody>
 					</table>
+				</div>
+			</div>
+
+			<div className="card mt">
+				<h2>Sales summary</h2>
+				<div className="stat-grid">
+					<div className="stat-card">
+						<span>Total birds sold</span>
+						<strong>{saleStats.totalBirds}</strong>
+					</div>
+					<div className="stat-card">
+						<span>Avg weight per bird (kg)</span>
+						<strong>{saleStats.totalBirds > 0 ? saleStats.avgPerBird.toFixed(3) : "-"}</strong>
+					</div>
 				</div>
 			</div>
 		</div>

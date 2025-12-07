@@ -48,6 +48,10 @@ export default function FinalReport() {
 
 	const selectedFlock = useMemo(() => flocks.find((f) => f._id === selectedFlockId), [flocks, selectedFlockId]);
 	const isClosed = selectedFlock?.status === "closed";
+	const formatAvgPerBird = (value) => {
+		const num = Number(value);
+		return Number.isFinite(num) ? num.toFixed(3) : "-";
+	};
 
 	const handleClose = async (e) => {
 		e.preventDefault();
@@ -88,6 +92,7 @@ export default function FinalReport() {
 		{ label: "Feed cost remaining", value: data?.feedCostRemaining ?? "-" },
 		{ label: "Birds sold", value: data?.totalBirdsSold ?? "-" },
 		{ label: "Weight sold (kg)", value: data?.totalWeightSold ?? "-" },
+		{ label: "Avg weight per bird (kg)", value: formatAvgPerBird(data?.avgWeightPerBird) },
 		{ label: "Total medicine cost", value: data?.totalMedicineCost ?? "-" },
 	];
 
