@@ -4,7 +4,7 @@ import { feedApi } from "../services/api";
 import { createBatchLabelMap, getTodayISO, formatIndiaDate } from "../utils/helpers";
 
 const today = getTodayISO();
-const FEED_TYPE_CHOICES = ["1", "2", "3", "4", "5"];
+const FEED_TYPE_CHOICES = ["BPS 1", "BS 2", "BF 3"];
 const DEFAULT_KG_PER_BAG = 60;
 
 const isDailyUsageLog = (log = {}) => {

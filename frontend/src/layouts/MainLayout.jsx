@@ -10,7 +10,7 @@ const links = [
   { to: "/daily-monitoring", label: "Daily" },
   { to: "/sales", label: "Sales" },
   { to: "/current-report", label: "Current" },
-  { to: "/final-report", label: "Final" },
+  { to: "/performance", label: "Performance" },
 ];
 
 export default function MainLayout() {
@@ -50,8 +50,8 @@ export default function MainLayout() {
             </button>
             <div className="spacer" />
             <div className="header-actions">
-              <Link to="/final-report" className="ghost">
-                Farm closing report
+              <Link to="/performance" className="ghost">
+                Performance report
               </Link>
               <span className="user-name">{user?.name}</span>
               <button onClick={logout} className="ghost">

@@ -30,6 +30,7 @@ export const flockApi = {
 	create: (payload) => unwrap(api.post("/flocks", payload)),
 	update: (id, payload) => unwrap(api.patch(`/flocks/${id}`, payload)),
 	close: (id, payload = {}) => unwrap(api.patch(`/flocks/${id}/close`, payload)),
+	dashboardSummary: () => unwrap(api.get("/flocks/dashboard/summary")),
 };
 
 export const feedApi = {
@@ -62,6 +63,7 @@ export const salesApi = {
 export const reportApi = {
 	current: (params = {}) => unwrap(api.get("/current-report", { params })),
 	final: (params = {}) => unwrap(api.get("/closing-report", { params })),
+	finalPdf: (flockId) => api.get(`/closing-report/${flockId}/pdf`, { responseType: "blob" }),
 };
 
 export default api;

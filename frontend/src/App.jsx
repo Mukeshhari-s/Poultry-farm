@@ -13,7 +13,7 @@ const Medical = lazy(() => import("./pages/Medical"));
 const DailyMonitoring = lazy(() => import("./pages/DailyMonitoring"));
 const Sales = lazy(() => import("./pages/Sales"));
 const CurrentReport = lazy(() => import("./pages/CurrentReport"));
-const FinalReport = lazy(() => import("./pages/FinalReport"));
+const Performance = lazy(() => import("./pages/Performance"));
 
 const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
@@ -53,7 +53,7 @@ export default function App() {
             <Route path="daily-monitoring" element={<DailyMonitoring />} />
             <Route path="sales" element={<Sales />} />
             <Route path="current-report" element={<CurrentReport />} />
-            <Route path="final-report" element={<FinalReport />} />
+            <Route path="performance" element={<Performance />} />
           </Route>
 
           <Route path="login" element={<LoginLayout />}>

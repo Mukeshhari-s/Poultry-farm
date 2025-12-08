@@ -36,6 +36,7 @@ app.use('/api/daily', authMiddleware, require('./routes/dailyMonitoring'));
 app.use('/api/sale', authMiddleware, require('./routes/sale'));
 app.use('/api/current-report', authMiddleware, require('./routes/currentReport'));
 app.use('/api/closing-report', authMiddleware, require('./routes/closingReport'));
+app.use('/api/admin', authMiddleware, require('./routes/adminOverview'));
 
 // ----------------------------------------
 

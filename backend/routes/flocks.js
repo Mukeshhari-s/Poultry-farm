@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const Flock = require('../models/Flock');
 const DailyMonitoring = require('../models/DailyMonitoring');
+const Feed = require('../models/Feed');
+const Sale = require('../models/Sale');
 const { parseDateOnly } = require('../utils/date');
 
 const MIN_CLOSING_AGE = 40;
@@ -173,6 +175,75 @@ router.patch('/:id/close', async (req, res) => {
   } catch (err) {
     console.error('Close flock error', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+const KG_PER_BAG = 60;
+
+router.get('/dashboard/summary', async (req, res) => {
+  try {
+    const ownerId = req.user._id;
+    const flocks = await Flock.find({ owner: ownerId }).sort({ createdAt: -1 }).lean();
+    if (!flocks.length) return res.json([]);
+
+    const batchNos = flocks.map((f) => f.batch_no).filter(Boolean);
+    const flockIds = flocks.map((f) => f._id);
+    const flockIdToBatch = new Map(flocks.map((f) => [f._id.toString(), f.batch_no]));
+
+    const feedQuery = { owner: ownerId };
+    if (batchNos.length || flockIds.length) {
+      feedQuery.$or = [];
+      if (batchNos.length) feedQuery.$or.push({ batch_no: { $in: batchNos } });
+      if (flockIds.length) feedQuery.$or.push({ flockId: { $in: flockIds } });
+    }
+
+    const [feedLogs, sales] = await Promise.all([
+      Feed.find(feedQuery).lean(),
+      Sale.find({ owner: ownerId, batch_no: { $in: batchNos } }).lean(),
+    ]);
+
+    const feedByBatch = {};
+    feedLogs.forEach((entry) => {
+      const batchNo = entry.batch_no || (entry.flockId ? flockIdToBatch.get(entry.flockId.toString()) : null);
+      if (!batchNo) return;
+      const bucket = feedByBatch[batchNo] || { kgOut: 0 };
+      bucket.kgOut += Number(entry.kgOut || 0);
+      feedByBatch[batchNo] = bucket;
+    });
+
+    const salesByBatch = {};
+    sales.forEach((entry) => {
+      const batchNo = entry.batch_no;
+      if (!batchNo) return;
+      const bucket = salesByBatch[batchNo] || { birds: 0, weight: 0 };
+      bucket.birds += Number(entry.birds || 0);
+      bucket.weight += Number(entry.total_weight || 0);
+      salesByBatch[batchNo] = bucket;
+    });
+
+    const summary = flocks.map((flock) => {
+      const feedStats = feedByBatch[flock.batch_no] || { kgOut: 0 };
+      const saleStats = salesByBatch[flock.batch_no] || { birds: 0, weight: 0 };
+      const feedUsedKg = Number(feedStats.kgOut.toFixed(3));
+      const feedUsedBags = Number((feedUsedKg / KG_PER_BAG).toFixed(2));
+      const chicksOut = Math.round(saleStats.birds);
+      const totalWeightKg = Number(saleStats.weight.toFixed(3));
+      return {
+        batch_no: flock.batch_no,
+        chicksIn: Number(flock.totalChicks || 0),
+        chicksOut,
+        totalFeedKg: feedUsedKg,
+        totalFeedBags: feedUsedBags,
+        totalWeightKg,
+        finalAmount: null,
+        status: flock.status,
+      };
+    });
+
+    res.json(summary);
+  } catch (err) {
+    console.error('dashboard summary error', err);
+    res.status(500).json({ error: 'Unable to load batch summary', details: err.message });
   }
 });
 

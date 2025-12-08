@@ -29,6 +29,15 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
 
+  const logout = useCallback(() => {
+    setToken(null);
+    setUser(null);
+    setAuthError(null);
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem(SESSION_CLOSED_AT_KEY);
+  }, []);
+
   useEffect(() => {
     if (token) localStorage.setItem("token", token);
     else localStorage.removeItem("token");
@@ -64,15 +73,6 @@ export const AuthProvider = ({ children }) => {
     if (user) localStorage.setItem("user", JSON.stringify(user));
     else localStorage.removeItem("user");
   }, [user]);
-
-  const logout = useCallback(() => {
-    setToken(null);
-    setUser(null);
-    setAuthError(null);
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    localStorage.removeItem(SESSION_CLOSED_AT_KEY);
-  }, []);
 
   const resolveAuthResponse = (data) => {
     if (data?.token) setToken(data.token);
