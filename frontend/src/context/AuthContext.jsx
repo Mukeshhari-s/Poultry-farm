@@ -4,12 +4,16 @@ import React, {
   useEffect,
   useMemo,
   useContext,
+  useCallback,
 } from "react";
 import authService from "../services/authService";
 
 export const AuthContext = createContext(null);
 
 export const useAuth = () => useContext(AuthContext);
+
+const SESSION_CLOSED_AT_KEY = "authSessionClosedAt";
+const SESSION_TIMEOUT_MS = 60 * 60 * 1000;
 
 const readUser = () => {
   try {
@@ -31,21 +35,51 @@ export const AuthProvider = ({ children }) => {
   }, [token]);
 
   useEffect(() => {
+    if (!token) {
+      localStorage.removeItem(SESSION_CLOSED_AT_KEY);
+      return;
+    }
+    const closedAtRaw = localStorage.getItem(SESSION_CLOSED_AT_KEY);
+    if (closedAtRaw) {
+      const closedAt = Number(closedAtRaw);
+      localStorage.removeItem(SESSION_CLOSED_AT_KEY);
+      if (Number.isFinite(closedAt) && Date.now() - closedAt >= SESSION_TIMEOUT_MS) {
+        logout();
+        return;
+      }
+    }
+    const handleBeforeUnload = () => {
+      localStorage.setItem(SESSION_CLOSED_AT_KEY, Date.now().toString());
+    };
+    window.addEventListener("pagehide", handleBeforeUnload);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("pagehide", handleBeforeUnload);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [token, logout]);
+
+
+  useEffect(() => {
     if (user) localStorage.setItem("user", JSON.stringify(user));
     else localStorage.removeItem("user");
   }, [user]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setToken(null);
     setUser(null);
     setAuthError(null);
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-  };
+    localStorage.removeItem(SESSION_CLOSED_AT_KEY);
+  }, []);
 
   const resolveAuthResponse = (data) => {
     if (data?.token) setToken(data.token);
     if (data?.user) setUser(data.user);
+    if (data?.token) {
+      localStorage.removeItem(SESSION_CLOSED_AT_KEY);
+    }
   };
 
   const loginUser = async (credentials) => {
@@ -117,7 +151,7 @@ export const AuthProvider = ({ children }) => {
       requestPasswordReset,
       resetPassword,
     }),
-    [token, user, loading, authError]
+    [token, user, loading, authError, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
