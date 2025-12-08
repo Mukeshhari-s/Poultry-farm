@@ -44,10 +44,12 @@ async function buildClosingReport(ownerId, flockId) {
       birdsAtStart,
       feedKg,
       feedPerBird,
+      avgWeight: safeNum(d.avgWeight),
     };
   });
   const totalMortality = cumulativeMort;
   const mortalityPercent = totalChicks > 0 ? (totalMortality / totalChicks) * 100 : 0;
+  const balanceChicks = Math.max(0, totalChicks - totalMortality);
 
   const feedQuery = { owner: ownerId, $or: [{ flockId: flock._id }, { batch_no: flock.batch_no }] };
   const feedRecords = await Feed.find(feedQuery).lean();
@@ -101,6 +103,8 @@ async function buildClosingReport(ownerId, flockId) {
   const totalBirdsSold = sales.reduce((s, x) => s + safeNum(x.birds || x.count || x.qty), 0);
   const totalWeightSold = sales.reduce((s, x) => s + safeNum(x.weight || x.total_weight || 0), 0);
   const avgWeightPerBird = totalBirdsSold > 0 ? totalWeightSold / totalBirdsSold : 0;
+  const latestAvgWeightRecorded = rows.length ? safeNum(rows[rows.length - 1].avgWeight) : null;
+  const avgWeightReference = avgWeightPerBird || latestAvgWeightRecorded;
   const lastCumulativeMort = cumulativeMort;
   const remainingChicks = Math.max(0, totalChicks - lastCumulativeMort - totalBirdsSold);
 
@@ -115,21 +119,23 @@ async function buildClosingReport(ownerId, flockId) {
     .filter((age) => Number.isFinite(age));
   const meanSaleAge = saleAges.length ? saleAges.reduce((sum, age) => sum + age, 0) / saleAges.length : null;
 
-  const expectedBirdsSold = Math.max(0, totalChicks - totalMortality);
+  const expectedBirdsSold = balanceChicks;
   const shortExcess = totalBirdsSold - expectedBirdsSold;
   const totalFeedIntakeKg = totalFeedOut;
+  const cumulativeFeedPerBird = balanceChicks > 0 ? totalFeedIntakeKg / balanceChicks : null;
   const chickCostTotal = totalChickCost;
   const feedCostTotal = totalFeedCostOut;
   const medicineCostTotal = totalMedicineCost;
   const overhead = totalChicks * 6;
   const totalCost = chickCostTotal + feedCostTotal + medicineCostTotal + overhead;
   const productionCost = totalWeightSold > 0 ? totalCost / totalWeightSold : null;
-  const fcr = totalWeightSold > 0 ? totalFeedIntakeKg / totalWeightSold : null;
+  const fcr = avgWeightReference > 0 ? cumulativeFeedPerBird / avgWeightReference : null;
 
   const performance = {
     housedChicks: totalChicks,
     feedsInKg: totalFeedIn,
     feedIntakeKg: totalFeedIntakeKg,
+    cumulativeFeedPerBird,
     totalMortality,
     mortalityPercent,
     totalBirdsSales: totalBirdsSold,
@@ -185,6 +191,7 @@ async function buildClosingReport(ownerId, flockId) {
     totalMedicineCost,
     rows,
     medicineByDate,
+    cumulativeFeedPerBird,
     performance,
     validation,
     rawCounts: {
@@ -251,6 +258,7 @@ router.get('/:flockId/pdf', async (req, res) => {
       ['Total birds sold', formatNum(perf.totalBirdsSales ?? report.totalBirdsSold, 0)],
       ['Total bird weight (kg)', formatNum(perf.weightOfTotalBirds ?? report.totalWeightSold, 3)],
       ['Avg weight (kg)', formatNum(perf.avgWeight ?? report.avgWeightPerBird, 3)],
+      ['Cumulative feed per bird (kg)', formatNum(perf.cumulativeFeedPerBird ?? report.cumulativeFeedPerBird, 3)],
       ['Short / Excess (+/-)', formatSigned(perf.shortExcess ?? 0, 0)],
       ['Mean sale age (days)', formatNum(perf.meanAge, 1)],
       ['FCR', formatNum(perf.fcr, 3)],

@@ -108,6 +108,7 @@ export default function Performance() {
 			{ label: "Total birds sales", value: formatNumber(performance.totalBirdsSales ?? data?.totalBirdsSold, 0) },
 			{ label: "Weight of total birds (kg)", value: formatNumber(totalBirdWeight, 3) },
 			{ label: "Avg weight (kg)", value: formatNumber(performance.avgWeight ?? data?.avgWeightPerBird, 3) },
+			{ label: "Cumulative feed per bird (kg)", value: formatNumber(performance.cumulativeFeedPerBird ?? data?.cumulativeFeedPerBird, 3) },
 			{ label: "Short / excess (+/-)", value: formatSigned(performance.shortExcess ?? 0, 0) },
 			{ label: "Mean age (days)", value: formatNumber(performance.meanAge, 1) },
 			{ label: "FCR", value: formatNumber(performance.fcr, 3) },
