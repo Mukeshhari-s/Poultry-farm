@@ -824,8 +824,8 @@ export default function Feed() {
 							<tr>
 								<td>Net amount (in - out)</td>
 								<td>-</td>
-								<td>-</td>
-								<td>-</td>
+								<td>{(cumulativeFeedStats.totalInKg - cumulativeFeedStats.totalOutKg).toFixed(2)}</td>
+								<td>{(cumulativeFeedStats.totalInBags - cumulativeFeedStats.totalOutBags).toFixed(2)}</td>
 								<td>{cumulativeFeedStats.totalAmountDiff.toFixed(2)}</td>
 							</tr>
 						</tbody>

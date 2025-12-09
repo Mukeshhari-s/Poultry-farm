@@ -85,19 +85,46 @@ router.get('/', async (req, res) => {
       : { owner: ownerId, batch_no: flock.batch_no };
     const feedRecords = await Feed.find(feedQuery).lean();
     let totalFeedIn = 0;
-    let totalFeedOut = 0;        // feed route withdrawals
+    let totalFeedOut = 0;        // feed route withdrawals (not linked to daily record)
     let totalFeedUsed = 0;       // daily monitoring usage
-    let totalFeedCost = 0;
+
+    // For cost, mimic Feed page cumulative summary:
+    // totalFeedCost = totalInCost - totalOutCost (net amount).
+    let totalInCost = 0;
+    let totalOutCost = 0;
+
     feedRecords.forEach((f) => {
-      totalFeedIn += safeNum(f.kgIn || f.in_kg || f.qty_kg || f.qty || f.inKg || 0);
+      const inKg = safeNum(f.kgIn || f.in_kg || f.qty_kg || f.qty || f.inKg || 0);
       const outKg = safeNum(f.kgOut || f.out_kg || f.out || f.used_kg || 0);
-      totalFeedCost += safeNum(f.totalCost || f.total_cost || f.cost || 0);
+      const recordCost = safeNum(f.totalCost || f.total_cost || f.cost || 0);
+
+      // Track kg for feed balance and usage
+      if (inKg > 0) {
+        totalFeedIn += inKg;
+      }
+
       if (outKg > 0) {
         if (f.dailyRecord) totalFeedUsed += outKg;
         else totalFeedOut += outKg;
       }
+
+      // For cost, ignore daily-usage logs just like the Feed page
+      const typeKey = String(f.typeKey || '').toLowerCase();
+      const typeValue = String(f.type || '').toLowerCase();
+      const isDailyUsage = Boolean(f.dailyRecord) || typeKey === 'daily usage' || typeValue === 'daily usage';
+
+      if (isDailyUsage) return;
+
+      if (inKg > 0) {
+        totalInCost += recordCost;
+      }
+      if (outKg > 0) {
+        totalOutCost += recordCost;
+      }
     });
+
     const feedRemaining = totalFeedIn - totalFeedOut - totalFeedUsed;
+    const totalFeedCost = totalInCost - totalOutCost;
 
     // 5) medicine grouped by date
     const meds = await Medicine.find({ batch_no: flock.batch_no, owner: ownerId }).lean();
