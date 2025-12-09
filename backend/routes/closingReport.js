@@ -51,7 +51,9 @@ async function buildClosingReport(ownerId, flockId) {
   const mortalityPercent = totalChicks > 0 ? (totalMortality / totalChicks) * 100 : 0;
   const balanceChicks = Math.max(0, totalChicks - totalMortality);
 
-  const feedQuery = { owner: ownerId, $or: [{ flockId: flock._id }, { batch_no: flock.batch_no }] };
+  // For performance/feed summaries, use the same feed records as the Feed page:
+  // filter strictly by flockId (not batch_no), so values match cumulative feed summary.
+  const feedQuery = { owner: ownerId, flockId: flock._id };
   const feedRecords = await Feed.find(feedQuery).lean();
   let totalFeedIn = 0;
   let totalFeedOut = 0;
@@ -59,6 +61,8 @@ async function buildClosingReport(ownerId, flockId) {
   let totalFeedCostOut = 0;
   let summaryFeedInKg = 0;   // matches Feed page cumulative summary
   let summaryFeedOutKg = 0;  // matches Feed page cumulative summary
+  let summaryFeedInCost = 0;   // net cost in (excluding daily usage)
+  let summaryFeedOutCost = 0;  // net cost out (excluding daily usage)
   feedRecords.forEach((f) => {
     const inKg = safeNum(f.kgIn ?? f.in_kg ?? f.qty_kg ?? f.qty ?? 0);
     const outKg = safeNum(f.kgOut ?? f.out_kg ?? f.out ?? 0);
@@ -73,6 +77,7 @@ async function buildClosingReport(ownerId, flockId) {
       totalFeedCostIn += cost;
       if (!isDailyUsage) {
         summaryFeedInKg += inKg;
+        summaryFeedInCost += cost;
       }
     }
     if (outKg > 0) {
@@ -82,12 +87,14 @@ async function buildClosingReport(ownerId, flockId) {
       totalFeedCostOut += cost;
       if (!isDailyUsage) {
         summaryFeedOutKg += outKg;
+        summaryFeedOutCost += cost;
       }
     }
   });
   const feedRemaining = totalFeedIn - totalFeedOut;
   const feedCostRemaining = totalFeedCostIn - totalFeedCostOut;
   const netFeedKg = summaryFeedInKg - summaryFeedOutKg;
+  const netFeedCost = summaryFeedInCost - summaryFeedOutCost; // feed in - feed out cost (matches Feed page net amount)
   const totalFeedUsed = totalFeedIn - totalFeedOut;
   const medQuery = { batch_no: flock.batch_no, owner: ownerId };
   const meds = await Medicine.find(medQuery).lean();
@@ -134,10 +141,12 @@ async function buildClosingReport(ownerId, flockId) {
 
   const expectedBirdsSold = balanceChicks;
   const shortExcess = totalBirdsSold - expectedBirdsSold;
-  const totalFeedIntakeKg = totalFeedOut;
+  const totalFeedIntakeKg = totalFeedIn - totalFeedOut;
   const cumulativeFeedPerBird = balanceChicks > 0 ? totalFeedIntakeKg / balanceChicks : null;
   const chickCostTotal = totalChickCost;
-  const feedCostTotal = totalFeedCostOut;
+  // Feed cost should be based on net feed (feed in - feed out) * price,
+  // which matches the Feed page cumulative summary net amount.
+  const feedCostTotal = netFeedCost;
   const medicineCostTotal = totalMedicineCost;
   const overhead = totalChicks * 6;
   const totalCost = chickCostTotal + feedCostTotal + medicineCostTotal + overhead;
@@ -146,8 +155,9 @@ async function buildClosingReport(ownerId, flockId) {
 
   const performance = {
     housedChicks: totalChicks,
-    // feedsInKg is not used anymore on the UI; feedIntakeKg represents feed used
-    feedsInKg: totalFeedUsed,
+    // feedsInKg should mirror Feed page net kg (feed in - feed out, excluding daily usage)
+    feedsInKg: netFeedKg,
+    // feedIntakeKg represents total feed used (feed in - feed out over all records)
     feedIntakeKg: totalFeedIntakeKg,
     cumulativeFeedPerBird,
     totalMortality,
@@ -196,6 +206,7 @@ async function buildClosingReport(ownerId, flockId) {
     totalFeedIn,
     totalFeedOut,
     netFeedKg,
+    netFeedCost,
     feedRemaining,
     totalFeedCostIn,
     totalFeedCostOut,
@@ -267,7 +278,6 @@ router.get('/:flockId/pdf', async (req, res) => {
     const summaryMetrics = [
       ['Housed chicks', formatNum(perf.housedChicks, 0)],
       ['Feed in kg', formatNum(perf.feedsInKg ?? report.netFeedKg ?? (report.totalFeedIn - report.totalFeedOut), 2)],
-      ['Feed used (kg)', formatNum(perf.feedIntakeKg ?? report.totalFeedOut, 2)],
       ['Mortality', formatNum(perf.totalMortality ?? report.totalMortality, 0)],
       ['Mortality %', formatNum(perf.mortalityPercent ?? report.mortalityPercent, 2)],
       ['Total birds sold', formatNum(perf.totalBirdsSales ?? report.totalBirdsSold, 0)],

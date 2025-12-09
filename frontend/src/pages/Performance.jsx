@@ -102,8 +102,8 @@ export default function Performance() {
 		const gcPlaceholder = "--";
 		return [
 			{ label: "Housed chicks", value: formatNumber(performance.housedChicks ?? data?.totalChicks, 0) },
-			// Show feed used here (feedIntakeKg from performance / totalFeedOut from report)
-			{ label: "Feed in kg", value: formatNumber(performance.feedIntakeKg ?? data?.totalFeedOut, 2) },
+			// Feed in kg should match Feed page cumulative summary net kg (feed in - feed out)
+			{ label: "Feed in kg", value: formatNumber(performance.feedsInKg ?? data?.netFeedKg ?? ((data?.totalFeedIn ?? 0) - (data?.totalFeedOut ?? 0)), 2) },
 			{ label: "Mortality", value: formatNumber(performance.totalMortality ?? data?.totalMortality, 0) },
 			{ label: "Mortality %", value: formatPercent(mortPercent, 2) },
 			{ label: "Total birds sales", value: formatNumber(performance.totalBirdsSales ?? data?.totalBirdsSold, 0) },
@@ -114,7 +114,8 @@ export default function Performance() {
 			{ label: "Mean age (days)", value: formatNumber(performance.meanAge, 1) },
 			{ label: "FCR", value: formatNumber(performance.fcr, 3) },
 			{ label: "Chick cost", value: formatNumber(performance.chickCost ?? data?.totalChickCost, 2) },
-			{ label: "Feed cost", value: formatNumber(performance.feedCost ?? data?.totalFeedCostOut, 2) },
+			// Feed cost should match Feed page cumulative summary net amount (in - out total amount)
+			{ label: "Feed cost", value: formatNumber(data?.netFeedCost ?? performance.feedCost ?? data?.totalFeedCostOut, 2) },
 			{ label: "Medicine cost", value: formatNumber(performance.medicineCost ?? data?.totalMedicineCost, 2) },
 			{ label: "Over head", value: formatNumber(performance.overhead, 2) },
 			{ label: "Total cost", value: formatNumber(performance.totalCost, 2) },
