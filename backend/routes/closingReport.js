@@ -88,7 +88,7 @@ async function buildClosingReport(ownerId, flockId) {
   const feedRemaining = totalFeedIn - totalFeedOut;
   const feedCostRemaining = totalFeedCostIn - totalFeedCostOut;
   const netFeedKg = summaryFeedInKg - summaryFeedOutKg;
-
+  const totalFeedUsed = totalFeedIn - totalFeedOut;
   const medQuery = { batch_no: flock.batch_no, owner: ownerId };
   const meds = await Medicine.find(medQuery).lean();
   const medicineByDate = {};
@@ -147,7 +147,7 @@ async function buildClosingReport(ownerId, flockId) {
   const performance = {
     housedChicks: totalChicks,
     // feedsInKg is not used anymore on the UI; feedIntakeKg represents feed used
-    feedsInKg: netFeedKg,
+    feedsInKg: totalFeedUsed,
     feedIntakeKg: totalFeedIntakeKg,
     cumulativeFeedPerBird,
     totalMortality,
