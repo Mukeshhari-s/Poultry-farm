@@ -102,7 +102,8 @@ export default function Performance() {
 		const gcPlaceholder = "--";
 		return [
 			{ label: "Housed chicks", value: formatNumber(performance.housedChicks ?? data?.totalChicks, 0) },
-			{ label: "Feeds in (kg)", value: formatNumber(performance.feedIntakeKg ?? data?.totalFeedOut, 2) },
+			// Show feed used here (feedIntakeKg from performance / totalFeedOut from report)
+			{ label: "Feed in kg", value: formatNumber(performance.feedIntakeKg ?? data?.totalFeedOut, 2) },
 			{ label: "Mortality", value: formatNumber(performance.totalMortality ?? data?.totalMortality, 0) },
 			{ label: "Mortality %", value: formatPercent(mortPercent, 2) },
 			{ label: "Total birds sales", value: formatNumber(performance.totalBirdsSales ?? data?.totalBirdsSold, 0) },

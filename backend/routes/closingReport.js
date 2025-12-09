@@ -57,24 +57,37 @@ async function buildClosingReport(ownerId, flockId) {
   let totalFeedOut = 0;
   let totalFeedCostIn = 0;
   let totalFeedCostOut = 0;
+  let summaryFeedInKg = 0;   // matches Feed page cumulative summary
+  let summaryFeedOutKg = 0;  // matches Feed page cumulative summary
   feedRecords.forEach((f) => {
     const inKg = safeNum(f.kgIn ?? f.in_kg ?? f.qty_kg ?? f.qty ?? 0);
     const outKg = safeNum(f.kgOut ?? f.out_kg ?? f.out ?? 0);
+    const typeKey = String(f.typeKey || '').toLowerCase();
+    const typeValue = String(f.type || '').toLowerCase();
+    const isDailyUsage = Boolean(f.dailyRecord) || typeKey === 'daily usage' || typeValue === 'daily usage';
+
     if (inKg > 0) {
       totalFeedIn += inKg;
       const unitPrice = safeNum(f.unitPrice);
       const cost = f.totalCost !== undefined ? safeNum(f.totalCost) : safeNum(inKg * unitPrice);
       totalFeedCostIn += cost;
+      if (!isDailyUsage) {
+        summaryFeedInKg += inKg;
+      }
     }
     if (outKg > 0) {
       totalFeedOut += outKg;
       const unitPrice = safeNum(f.unitPrice);
       const cost = f.totalCost !== undefined ? safeNum(f.totalCost) : safeNum(outKg * unitPrice);
       totalFeedCostOut += cost;
+      if (!isDailyUsage) {
+        summaryFeedOutKg += outKg;
+      }
     }
   });
   const feedRemaining = totalFeedIn - totalFeedOut;
   const feedCostRemaining = totalFeedCostIn - totalFeedCostOut;
+  const netFeedKg = summaryFeedInKg - summaryFeedOutKg;
 
   const medQuery = { batch_no: flock.batch_no, owner: ownerId };
   const meds = await Medicine.find(medQuery).lean();
@@ -133,7 +146,8 @@ async function buildClosingReport(ownerId, flockId) {
 
   const performance = {
     housedChicks: totalChicks,
-    feedsInKg: totalFeedIn,
+    // feedsInKg is not used anymore on the UI; feedIntakeKg represents feed used
+    feedsInKg: netFeedKg,
     feedIntakeKg: totalFeedIntakeKg,
     cumulativeFeedPerBird,
     totalMortality,
@@ -181,6 +195,7 @@ async function buildClosingReport(ownerId, flockId) {
     mortalityPercent,
     totalFeedIn,
     totalFeedOut,
+    netFeedKg,
     feedRemaining,
     totalFeedCostIn,
     totalFeedCostOut,
@@ -251,7 +266,7 @@ router.get('/:flockId/pdf', async (req, res) => {
     doc.fontSize(11);
     const summaryMetrics = [
       ['Housed chicks', formatNum(perf.housedChicks, 0)],
-      ['Feeds in (kg)', formatNum(perf.feedsInKg ?? report.totalFeedIn, 2)],
+      ['Feed in kg', formatNum(perf.feedsInKg ?? report.netFeedKg ?? (report.totalFeedIn - report.totalFeedOut), 2)],
       ['Feed used (kg)', formatNum(perf.feedIntakeKg ?? report.totalFeedOut, 2)],
       ['Mortality', formatNum(perf.totalMortality ?? report.totalMortality, 0)],
       ['Mortality %', formatNum(perf.mortalityPercent ?? report.mortalityPercent, 2)],
