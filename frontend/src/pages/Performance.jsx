@@ -100,10 +100,13 @@ export default function Performance() {
 		const mortPercent = performance.mortalityPercent ?? data?.mortalityPercent;
 		const totalBirdWeight = performance.weightOfTotalBirds ?? data?.totalWeightSold;
 		const gcPlaceholder = "--";
+		// Feed in kg: net kg from closing report / Feed page summary
+		const netFeedInKg = data?.netFeedKg ?? ((data?.totalFeedIn ?? 0) - (data?.totalFeedOut ?? 0));
+		// FCR = Feed in kg / Weight of total birds (kg)
+		const fcrDisplay = totalBirdWeight > 0 ? netFeedInKg / totalBirdWeight : null;
 		return [
 			{ label: "Housed chicks", value: formatNumber(performance.housedChicks ?? data?.totalChicks, 0) },
-			// Feed in kg should match Feed page cumulative summary net kg (feed in - feed out)
-			{ label: "Feed in kg", value: formatNumber(performance.feedsInKg ?? data?.netFeedKg ?? ((data?.totalFeedIn ?? 0) - (data?.totalFeedOut ?? 0)), 2) },
+			{ label: "Feed in kg", value: formatNumber(netFeedInKg, 2) },
 			{ label: "Mortality", value: formatNumber(performance.totalMortality ?? data?.totalMortality, 0) },
 			{ label: "Mortality %", value: formatPercent(mortPercent, 2) },
 			{ label: "Total birds sales", value: formatNumber(performance.totalBirdsSales ?? data?.totalBirdsSold, 0) },
@@ -112,14 +115,14 @@ export default function Performance() {
 			{ label: "Cumulative feed per bird (kg)", value: formatNumber(performance.cumulativeFeedPerBird ?? data?.cumulativeFeedPerBird, 3) },
 			{ label: "Short / excess (+/-)", value: formatSigned(performance.shortExcess ?? 0, 0) },
 			{ label: "Mean age (days)", value: formatNumber(performance.meanAge, 1) },
-			{ label: "FCR", value: formatNumber(performance.fcr, 3) },
+			{ label: "FCR", value: formatNumber(fcrDisplay, 3) },
 			{ label: "Chick cost", value: formatNumber(performance.chickCost ?? data?.totalChickCost, 2) },
-			// Feed cost should match Feed page cumulative summary net amount (in - out total amount)
-			{ label: "Feed cost", value: formatNumber(data?.netFeedCost ?? performance.feedCost ?? data?.totalFeedCostOut, 2) },
+			// Feed cost: net amount from Feed page (kg * price)
+			{ label: "Feed cost", value: formatNumber(performance.feedCost ?? data?.netFeedCost ?? ((data?.totalFeedCostIn ?? 0) - (data?.totalFeedCostOut ?? 0)), 2) },
 			{ label: "Medicine cost", value: formatNumber(performance.medicineCost ?? data?.totalMedicineCost, 2) },
 			{ label: "Over head", value: formatNumber(performance.overhead, 2) },
 			{ label: "Total cost", value: formatNumber(performance.totalCost, 2) },
-			{ label: "Production cost", value: formatNumber(performance.productionCost, 3) },
+			{ label: "Production cost", value: formatNumber(performance.productionCost, 2) },
 			{ label: "G.C", value: gcPlaceholder },
 			{ label: "Total", value: gcPlaceholder },
 			{ label: "TDS (1%)", value: gcPlaceholder },

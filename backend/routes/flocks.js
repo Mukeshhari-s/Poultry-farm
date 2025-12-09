@@ -206,7 +206,8 @@ router.get('/dashboard/summary', async (req, res) => {
     feedLogs.forEach((entry) => {
       const batchNo = entry.batch_no || (entry.flockId ? flockIdToBatch.get(entry.flockId.toString()) : null);
       if (!batchNo) return;
-      const bucket = feedByBatch[batchNo] || { kgOut: 0 };
+      const bucket = feedByBatch[batchNo] || { kgIn: 0, kgOut: 0 };
+      bucket.kgIn += Number(entry.kgIn || 0);
       bucket.kgOut += Number(entry.kgOut || 0);
       feedByBatch[batchNo] = bucket;
     });
@@ -222,9 +223,11 @@ router.get('/dashboard/summary', async (req, res) => {
     });
 
     const summary = flocks.map((flock) => {
-      const feedStats = feedByBatch[flock.batch_no] || { kgOut: 0 };
+      const feedStats = feedByBatch[flock.batch_no] || { kgIn: 0, kgOut: 0 };
       const saleStats = salesByBatch[flock.batch_no] || { birds: 0, weight: 0 };
-      const feedUsedKg = Number(feedStats.kgOut.toFixed(3));
+      // Feed used on dashboard = feed in - feed out (net), same as other pages
+      const rawFeedUsedKg = Number(feedStats.kgIn || 0) - Number(feedStats.kgOut || 0);
+      const feedUsedKg = Number(rawFeedUsedKg.toFixed(3));
       const feedUsedBags = Number((feedUsedKg / KG_PER_BAG).toFixed(2));
       const chicksOut = Math.round(saleStats.birds);
       const totalWeightKg = Number(saleStats.weight.toFixed(3));
