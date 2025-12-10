@@ -415,6 +415,7 @@ router.get('/:flockId/pdf', async (req, res) => {
         0
       )}, tolerance ±${validation.tolerance || SALES_TOLERANCE})`
     );
+    doc.end();
   } catch (err) {
     console.error('closing report pdf error', err);
     res.status(500).json({ error: 'Unable to build PDF', details: err.message });
