@@ -208,6 +208,25 @@ async function buildClosingReport(ownerId, flockId) {
   // FCR = Feed in kg (net) / Weight of total birds (kg)
   const fcr = totalWeightSold > 0 ? netFeedKg / totalWeightSold : null;
 
+  // EEF = (100 - mortality%) * avg weight/bird * 100 / (mean age * FCR)
+  let eef = null;
+  const mortPct = mortalityPercent;
+  const viabilityPct = Number.isFinite(mortPct) ? 100 - mortPct : null;
+  if (
+    viabilityPct != null &&
+    viabilityPct > 0 &&
+    avgWeightPerBird > 0 &&
+    meanSaleAge != null &&
+    meanSaleAge > 0 &&
+    fcr != null &&
+    fcr > 0
+  ) {
+    const raw = (viabilityPct * avgWeightPerBird * 100) / (meanSaleAge * fcr);
+    if (Number.isFinite(raw)) {
+      eef = raw;
+    }
+  }
+
   const performance = {
     housedChicks: totalChicks,
     // feedsInKg is not used anymore on the UI; feedIntakeKg represents feed used
@@ -223,6 +242,7 @@ async function buildClosingReport(ownerId, flockId) {
     expectedBirdsSold,
     meanAge: meanSaleAge,
     fcr,
+    eef,
     chickCost: chickCostTotal,
     feedCost: feedCostTotal,
     medicineCost: medicineCostTotal,
@@ -339,8 +359,9 @@ router.get('/:flockId/pdf', async (req, res) => {
       ['Avg weight (kg)', formatNum(perf.avgWeight ?? report.avgWeightPerBird, 3)],
       ['Cumulative feed per bird (kg)', formatNum(perf.cumulativeFeedPerBird ?? report.cumulativeFeedPerBird, 3)],
       ['Short / Excess (+/-)', formatSigned(perf.shortExcess ?? 0, 0)],
-      ['Mean sale age (days)', formatNum(perf.meanAge, 1)],
+      ['Mean sale age (days)', formatNum(perf.meanAge, 2)],
       ['FCR', formatNum(perf.fcr, 3)],
+      ['EEF', perf.eef != null ? formatNum(perf.eef, 2) : '-'],
       ['Chick cost', formatNum(perf.chickCost ?? report.totalChickCost, 2)],
         ['Feed cost', formatNum(perf.feedCost ?? report.netFeedCost ?? (report.totalFeedCostIn - report.totalFeedCostOut), 2)],
       ['Medicine cost', formatNum(perf.medicineCost ?? report.totalMedicineCost, 2)],

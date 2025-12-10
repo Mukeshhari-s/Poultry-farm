@@ -112,6 +112,8 @@ export default function Performance() {
 		const tds = performance.tds;
 		const netGc = performance.netGc;
 		const finalAmount = performance.finalAmount;
+		const shortExcessRaw = performance.shortExcess ?? 0;
+		const eef = performance.eef;
 		return [
 			{ label: "Housed chicks", value: formatNumber(performance.housedChicks ?? data?.totalChicks, 0) },
 			{ label: "Feed in kg", value: formatNumber(netFeedInKg, 2) },
@@ -121,9 +123,10 @@ export default function Performance() {
 			{ label: "Weight of total birds (kg)", value: formatNumber(totalBirdWeight, 3) },
 			{ label: "Avg weight (kg)", value: formatNumber(performance.avgWeight ?? data?.avgWeightPerBird, 3) },
 			{ label: "Cumulative feed per bird (kg)", value: formatNumber(performance.cumulativeFeedPerBird ?? data?.cumulativeFeedPerBird, 3) },
-			{ label: "Short / excess (+/-)", value: formatSigned(performance.shortExcess ?? 0, 0) },
-			{ label: "Mean age (days)", value: formatNumber(performance.meanAge, 1) },
+			{ label: "Short / excess (+/-)", value: formatSigned(shortExcessRaw, 0) },
+			{ label: "Mean age (days)", value: formatNumber(performance.meanAge, 2) },
 			{ label: "FCR", value: formatNumber(fcrDisplay, 3) },
+			{ label: "EEF", value: formatNumber(eef, 2) },
 			{ label: "Chick cost", value: formatNumber(performance.chickCost ?? data?.totalChickCost, 2) },
 			// Feed cost: net amount from Feed page (kg * price)
 			{ label: "Feed cost", value: formatNumber(performance.feedCost ?? data?.netFeedCost ?? ((data?.totalFeedCostIn ?? 0) - (data?.totalFeedCostOut ?? 0)), 2) },
