@@ -126,4 +126,21 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
+// ✅ DELETE medicine entry
+router.delete('/:id', async (req, res) => {
+  try {
+    const ownerId = req.user._id;
+    const { id } = req.params;
+
+    const med = await Medicine.findOne({ _id: id, owner: ownerId });
+    if (!med) return res.status(404).json({ error: 'Medicine entry not found' });
+
+    await med.deleteOne();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting medicine:', err);
+    res.status(500).json({ error: 'Error deleting medicine' });
+  }
+});
+
 module.exports = router;

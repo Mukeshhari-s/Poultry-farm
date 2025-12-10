@@ -317,4 +317,21 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
+// Delete feed entry
+router.delete('/:id', async (req, res) => {
+  try {
+    const ownerId = req.user._id;
+    const { id } = req.params;
+
+    const feed = await Feed.findOne({ _id: id, owner: ownerId });
+    if (!feed) return res.status(404).json({ error: 'Feed entry not found' });
+
+    await feed.deleteOne();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting feed entry:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

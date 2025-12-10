@@ -253,4 +253,24 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
+// Delete daily monitoring entry (and linked daily usage feed log, if any)
+router.delete('/:id', async (req, res) => {
+  try {
+    const ownerId = req.user._id;
+    const { id } = req.params;
+
+    const rec = await DailyMonitoring.findOne({ _id: id, owner: ownerId });
+    if (!rec) return res.status(404).json({ error: 'Daily record not found' });
+
+    // Remove linked feed daily usage entry, if present
+    await Feed.deleteOne({ owner: ownerId, dailyRecord: rec._id });
+
+    await rec.deleteOne();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting daily monitoring entry:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

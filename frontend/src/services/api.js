@@ -39,6 +39,7 @@ export const feedApi = {
 	addIn: (payload) => unwrap(api.post("/feed/in", payload)),
 	addOut: (payload) => unwrap(api.post("/feed/out", payload)),
 	update: (id, payload) => unwrap(api.patch(`/feed/${id}`, payload)),
+	remove: (id) => unwrap(api.delete(`/feed/${id}`)),
 };
 
 export const medicineApi = {
@@ -46,12 +47,14 @@ export const medicineApi = {
 	batches: () => unwrap(api.get("/medicine/batches")),
 	create: (payload) => unwrap(api.post("/medicine", payload)),
 	update: (id, payload) => unwrap(api.patch(`/medicine/${id}`, payload)),
+	remove: (id) => unwrap(api.delete(`/medicine/${id}`)),
 };
 
 export const monitoringApi = {
 	create: (payload) => unwrap(api.post("/daily", payload)),
 	update: (id, payload) => unwrap(api.patch(`/daily/${id}`, payload)),
 	list: (params = {}) => unwrap(api.get("/daily", { params })),
+	remove: (id) => unwrap(api.delete(`/daily/${id}`)),
 };
 
 export const salesApi = {
@@ -59,6 +62,7 @@ export const salesApi = {
 	create: (payload) => unwrap(api.post("/sale", payload)),
 	remaining: (batchNo) => unwrap(api.get(`/sale/remaining/${batchNo}`)),
 	update: (id, payload) => unwrap(api.patch(`/sale/${id}`, payload)),
+	remove: (id) => unwrap(api.delete(`/sale/${id}`)),
 };
 
 export const reportApi = {

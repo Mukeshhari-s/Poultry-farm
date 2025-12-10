@@ -382,6 +382,23 @@ export default function Feed() {
 		setEditingFeed(null);
 	};
 
+	const deleteFeedEntry = async (log) => {
+		if (!log?._id) return;
+		if (!window.confirm("Delete this feed entry?")) return;
+		setError("");
+		setSuccess("");
+		try {
+			await feedApi.remove(log._id);
+			setSuccess("Feed entry deleted.");
+			if (editingFeed && editingFeed._id === log._id) {
+				setEditingFeed(null);
+			}
+			fetchFeed(selectedFlock);
+		} catch (err) {
+			setError(err.response?.data?.error || err.message || "Unable to delete feed entry");
+		}
+	};
+
 	const onFeedEditSubmit = async (e) => {
 		e.preventDefault();
 		if (!editingFeed) return;
@@ -804,9 +821,18 @@ export default function Feed() {
 										<td>{batchLabel || "-"}</td>
 										<td>
 											{isEditable && (
-												<button type="button" className="link" onClick={() => onEditFeed(log)}>
-													Edit
-												</button>
+												<>
+													<button type="button" className="link" onClick={() => onEditFeed(log)}>
+														Edit
+													</button>
+													<button
+														type="button"
+														className="link danger"
+														onClick={() => deleteFeedEntry(log)}
+													>
+														Delete
+													</button>
+												</>
 											)}
 										</td>
 									</tr>

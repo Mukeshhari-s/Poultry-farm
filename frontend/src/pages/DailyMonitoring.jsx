@@ -222,6 +222,23 @@ export default function DailyMonitoring() {
 		setSuccess("");
 	};
 
+	const deleteRow = async (row) => {
+		if (!row?._id) return;
+		if (!window.confirm("Delete this daily record?")) return;
+		setError("");
+		setSuccess("");
+		try {
+			await monitoringApi.remove(row._id);
+			setSuccess("Daily record deleted.");
+			if (editingRow && editingRow._id === row._id) {
+				cancelEdit();
+			}
+			loadReport(selectedBatch);
+		} catch (err) {
+			setError(err.response?.data?.error || err.message || "Unable to delete record");
+		}
+	};
+
 	const cancelEdit = () => {
 		setEditingRow(null);
 		setEditForm(emptyEditForm);
@@ -419,9 +436,18 @@ export default function DailyMonitoring() {
 										<td>{row.avgWeight ?? "-"}</td>
 										<td>
 											{isSelectedActive && (
-												<button type="button" className="link" onClick={() => startEdit(row)}>
-													Edit
-												</button>
+												<>
+													<button type="button" className="link" onClick={() => startEdit(row)}>
+														Edit
+													</button>
+													<button
+														type="button"
+														className="link danger"
+														onClick={() => deleteRow(row)}
+													>
+														Delete
+													</button>
+												</>
 											)}
 										</td>
 									</tr>

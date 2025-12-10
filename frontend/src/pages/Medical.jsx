@@ -165,6 +165,23 @@ export default function Medical() {
 		setForm({ batch_no: "", date: today, medicine_name: "", quantity: "", unitPrice: "", totalCost: "", dose: "" });
 	};
 
+	const onDeleteRecord = async (rec) => {
+		if (!rec?._id) return;
+		if (!window.confirm("Delete this medicine entry?")) return;
+		setError("");
+		setSuccess("");
+		try {
+			await medicineApi.remove(rec._id);
+			setSuccess("Medicine entry deleted.");
+			if (editingRecord && editingRecord._id === rec._id) {
+				cancelEdit();
+			}
+			fetchRecords();
+		} catch (err) {
+			setError(err.response?.data?.error || err.message || "Unable to delete medicine entry");
+		}
+	};
+
 	return (
 		<div className="page">
 			<div className="page-header">
@@ -286,9 +303,18 @@ export default function Medical() {
 										<td>{rec.dose}</td>
 										<td>
 											{canEdit && (
-												<button type="button" className="link" onClick={() => onEditRecord(rec)}>
-													Edit
-												</button>
+												<>
+													<button type="button" className="link" onClick={() => onEditRecord(rec)}>
+														Edit
+													</button>
+													<button
+														type="button"
+														className="link danger"
+														onClick={() => onDeleteRecord(rec)}
+													>
+														Delete
+													</button>
+												</>
 											)}
 										</td>
 									</tr>

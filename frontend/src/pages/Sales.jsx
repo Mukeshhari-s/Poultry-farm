@@ -334,6 +334,24 @@ export default function Sales() {
 		}
 	};
 
+	const deleteSale = async (sale) => {
+		if (!sale?._id) return;
+		if (!window.confirm("Delete this sale entry?")) return;
+		setError("");
+		setSuccess("");
+		try {
+			await salesApi.remove(sale._id);
+			setSuccess("Sale entry deleted.");
+			const batchNo = selectedBatch || sale.batch_no;
+			if (editingSale && editingSale._id === sale._id) {
+				cancelEdit();
+			}
+			fetchSales(batchNo);
+		} catch (err) {
+			setError(err.response?.data?.error || err.message || "Unable to delete sale entry");
+		}
+	};
+
 	return (
 		<div className="page">
 			<div className="page-header">
@@ -571,9 +589,18 @@ export default function Sales() {
 										<td>{ageDisplay}</td>
 										<td>
 											{isSelectedActive && (
-												<button type="button" className="link" onClick={() => startEdit(sale)}>
-													Edit
-												</button>
+												<>
+													<button type="button" className="link" onClick={() => startEdit(sale)}>
+														Edit
+													</button>
+													<button
+														type="button"
+														className="link danger"
+														onClick={() => deleteSale(sale)}
+													>
+														Delete
+													</button>
+												</>
 											)}
 										</td>
 									</tr>

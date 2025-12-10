@@ -30,8 +30,15 @@ async function getRemainingBirds(batch_no, ownerId) {
   ]);
   const totalSold = soldAgg[0] ? soldAgg[0].totalSold : 0;
 
-  const remaining = (batch.totalChicks || 0) - (totalMort || 0) - (totalSold || 0);
-  return { batch, totalMort: totalMort || 0, totalSold: totalSold || 0, remaining: Math.max(0, remaining) };
+  const remainingRaw = (batch.totalChicks || 0) - (totalMort || 0) - (totalSold || 0);
+  return {
+    batch,
+    totalMort: totalMort || 0,
+    totalSold: totalSold || 0,
+    // remaining is clamped for UI, remainingRaw is used for strict math
+    remaining: Math.max(0, remainingRaw),
+    remainingRaw,
+  };
 }
 
 // Create sale
@@ -84,10 +91,13 @@ router.post('/', async (req, res) => {
     const computedTotal = roundWeight(loadWeightValue - emptyWeightValue);
     if (computedTotal <= 0) return res.status(400).json({ error: 'load_weight must be greater than empty_weight' });
 
-    // compute remaining
-    const { remaining } = await getRemainingBirds(batch_no, ownerId);
-    if (birds > remaining) {
-      return res.status(400).json({ error: `not enough birds. Remaining: ${remaining}` });
+    // compute remaining with tolerance of +/- 10 birds
+    const { remainingRaw } = await getRemainingBirds(batch_no, ownerId);
+    const tolerance = 10;
+    const allowed = (remainingRaw || 0) + tolerance;
+    if (birds > allowed) {
+      const displayRemaining = Math.max(0, remainingRaw || 0);
+      return res.status(400).json({ error: `not enough birds. Remaining: ${displayRemaining}, max allowed (with 10 tolerance): ${allowed}` });
     }
 
     // create sale record
@@ -181,10 +191,13 @@ router.patch('/:id', async (req, res) => {
     if (birds !== undefined) {
       const value = Number(birds);
       if (!Number.isFinite(value) || value <= 0) return res.status(400).json({ error: 'birds must be > 0' });
-      const { remaining } = await getRemainingBirds(sale.batch_no, ownerId);
-      const available = remaining + sale.birds; // add back previous value
-      if (value > available) {
-        return res.status(400).json({ error: `not enough birds. Remaining: ${available}` });
+      const { remainingRaw } = await getRemainingBirds(sale.batch_no, ownerId);
+      const tolerance = 10;
+      const baseAvailableRaw = (remainingRaw || 0) + sale.birds; // add back previous value
+      const allowed = baseAvailableRaw + tolerance;
+      if (value > allowed) {
+        const displayRemaining = Math.max(0, baseAvailableRaw || 0);
+        return res.status(400).json({ error: `not enough birds. Remaining: ${displayRemaining}, max allowed (with 10 tolerance): ${allowed}` });
       }
       sale.birds = value;
     }
@@ -224,6 +237,23 @@ router.patch('/:id', async (req, res) => {
   } catch (err) {
     console.error(err);
     if (err.message === 'batch_not_found') return res.status(400).json({ error: 'batch_no not found' });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete sale entry
+router.delete('/:id', async (req, res) => {
+  try {
+    const ownerId = req.user._id;
+    const { id } = req.params;
+
+    const sale = await Sale.findOne({ _id: id, owner: ownerId });
+    if (!sale) return res.status(404).json({ error: 'Sale entry not found' });
+
+    await sale.deleteOne();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error deleting sale entry:', err);
     res.status(500).json({ error: err.message });
   }
 });
