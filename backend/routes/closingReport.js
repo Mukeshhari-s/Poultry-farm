@@ -335,6 +335,8 @@ router.get('/:flockId/pdf', async (req, res) => {
     if (!report) return res.status(404).json({ error: 'Flock/batch not found' });
     const perf = report.performance || {};
     const validation = report.validation || {};
+    const user = req.user || {};
+    const userName = user.name || user.username || user.email || user.mobile || 'User';
     // Derive a human-friendly batch label (Batch 1, Batch 2, ...) similar to the frontend
     let batchLabel = report.flock.batch_no || 'Batch';
     try {
@@ -365,8 +367,8 @@ router.get('/:flockId/pdf', async (req, res) => {
     doc.pipe(res);
     doc.fontSize(18).text('Batch Performance Report', { align: 'center' });
     doc.moveDown();
-    doc.fontSize(12).text(`Batch: ${batchLabel}`);
     doc.fontSize(12).text(`User: ${userName}`);
+    doc.fontSize(12).text(`Batch: ${batchLabel}`);
     doc.text(`Start date: ${report.flock.start_date ? new Date(report.flock.start_date).toLocaleDateString() : 'N/A'}`);
     doc.text(`Status: ${report.flock.status || 'active'}`);
     doc.text(`Records captured: ${report.rows?.length || 0}`);

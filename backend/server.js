@@ -8,13 +8,30 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const DEFAULT_MONGO_URI = 'mongodb+srv://rkpoultry:mukesh@946@poultry.rhjgjoy.mongodb.net/?appName=Poultry';
 const helmet = require('helmet');
-app.use(helmet());
 
 // DB connect
 connectDB(process.env.MONGO_URI || DEFAULT_MONGO_URI);
 
 // middlewares
-app.use(cors());
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://poultry-farm-6pyr.vercel.app',
+];
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin) return callback(null, true); // allow non-browser tools
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(null, false);
+    },
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  })
+);
+app.use(helmet());
 app.use(express.json());
 
 // health routes
