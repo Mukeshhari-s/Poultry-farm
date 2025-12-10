@@ -4,6 +4,7 @@ const Flock = require('../models/Flock');
 const DailyMonitoring = require('../models/DailyMonitoring');
 const Feed = require('../models/Feed');
 const Sale = require('../models/Sale');
+const closingReportRouter = require('./closingReport');
 const { parseDateOnly } = require('../utils/date');
 
 const MIN_CLOSING_AGE = 40;
@@ -15,6 +16,11 @@ function ymd(d) {
   const m = String(dt.getMonth() + 1).padStart(2, '0');
   const day = String(dt.getDate()).padStart(2, '0');
   return `${y}${m}${day}`;
+}
+
+function safeNum(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
 }
 
 // Create new flock (chicks entry)
@@ -185,63 +191,30 @@ router.get('/dashboard/summary', async (req, res) => {
     const ownerId = req.user._id;
     const flocks = await Flock.find({ owner: ownerId }).sort({ createdAt: -1 }).lean();
     if (!flocks.length) return res.json([]);
+    const summary = [];
 
-    const batchNos = flocks.map((f) => f.batch_no).filter(Boolean);
-    const flockIds = flocks.map((f) => f._id);
-    const flockIdToBatch = new Map(flocks.map((f) => [f._id.toString(), f.batch_no]));
+    // Reuse closing report calculations so dashboard feed values
+    // exactly match Performance and Feed pages
+    for (const flock of flocks) {
+      const report = await closingReportRouter.buildClosingReport(ownerId, flock._id);
+      if (!report) continue;
 
-    const feedQuery = { owner: ownerId };
-    if (batchNos.length || flockIds.length) {
-      feedQuery.$or = [];
-      if (batchNos.length) feedQuery.$or.push({ batch_no: { $in: batchNos } });
-      if (flockIds.length) feedQuery.$or.push({ flockId: { $in: flockIds } });
-    }
+      const feedUsedKg = safeNum(report.netFeedKg);
+      const feedUsedBags = feedUsedKg > 0 ? safeNum(feedUsedKg / KG_PER_BAG) : 0;
+      const chicksOut = safeNum(report.totalBirdsSold);
+      const totalWeightKg = safeNum(report.totalWeightSold);
 
-    const [feedLogs, sales] = await Promise.all([
-      Feed.find(feedQuery).lean(),
-      Sale.find({ owner: ownerId, batch_no: { $in: batchNos } }).lean(),
-    ]);
-
-    const feedByBatch = {};
-    feedLogs.forEach((entry) => {
-      const batchNo = entry.batch_no || (entry.flockId ? flockIdToBatch.get(entry.flockId.toString()) : null);
-      if (!batchNo) return;
-      const bucket = feedByBatch[batchNo] || { kgIn: 0, kgOut: 0 };
-      bucket.kgIn += Number(entry.kgIn || 0);
-      bucket.kgOut += Number(entry.kgOut || 0);
-      feedByBatch[batchNo] = bucket;
-    });
-
-    const salesByBatch = {};
-    sales.forEach((entry) => {
-      const batchNo = entry.batch_no;
-      if (!batchNo) return;
-      const bucket = salesByBatch[batchNo] || { birds: 0, weight: 0 };
-      bucket.birds += Number(entry.birds || 0);
-      bucket.weight += Number(entry.total_weight || 0);
-      salesByBatch[batchNo] = bucket;
-    });
-
-    const summary = flocks.map((flock) => {
-      const feedStats = feedByBatch[flock.batch_no] || { kgIn: 0, kgOut: 0 };
-      const saleStats = salesByBatch[flock.batch_no] || { birds: 0, weight: 0 };
-      // Feed used on dashboard = feed in - feed out (net), same as other pages
-      const rawFeedUsedKg = Number(feedStats.kgIn || 0) - Number(feedStats.kgOut || 0);
-      const feedUsedKg = Number(rawFeedUsedKg.toFixed(3));
-      const feedUsedBags = Number((feedUsedKg / KG_PER_BAG).toFixed(2));
-      const chicksOut = Math.round(saleStats.birds);
-      const totalWeightKg = Number(saleStats.weight.toFixed(3));
-      return {
+      summary.push({
         batch_no: flock.batch_no,
-        chicksIn: Number(flock.totalChicks || 0),
+        chicksIn: safeNum(flock.totalChicks),
         chicksOut,
         totalFeedKg: feedUsedKg,
-        totalFeedBags: feedUsedBags,
-        totalWeightKg,
+        totalFeedBags: Number(feedUsedBags.toFixed(2)),
+        totalWeightKg: Number(totalWeightKg.toFixed(3)),
         finalAmount: null,
         status: flock.status,
-      };
-    });
+      });
+    }
 
     res.json(summary);
   } catch (err) {

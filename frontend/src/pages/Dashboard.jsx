@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useMemo } from "react";
 import useFlocks from "../hooks/useFlocks";
 import { useAuth } from "../context/AuthContext";
 import { flockApi, reportApi } from "../services/api";
+import { createBatchLabelMap } from "../utils/helpers";
 
 const formatBagsFromKg = (kgValue) => {
   const num = Number(kgValue);
@@ -35,6 +36,8 @@ export default function Dashboard() {
   const [selectedCompletedBatch, setSelectedCompletedBatch] = useState("");
   const [downloadingBatchId, setDownloadingBatchId] = useState("");
   const [pdfError, setPdfError] = useState("");
+
+  const batchLabelMap = useMemo(() => createBatchLabelMap(flocks), [flocks]);
 
   const completedBatches = useMemo(() => flocks.filter((f) => f.status === "closed"), [flocks]);
   const totalBatches = flocks.length;
@@ -163,7 +166,7 @@ export default function Dashboard() {
               </option>
               {completedBatches.map((batch) => (
                 <option key={batch._id} value={batch._id}>
-                  {batch.batch_no || batch.displayLabel || batch._id}
+                  {batch.displayLabel || batch.batch_no || batch._id}
                 </option>
               ))}
             </select>
@@ -311,7 +314,7 @@ export default function Dashboard() {
                 )}
                 {batchSummaries.map((item) => (
                   <tr key={item.batch_no}>
-                    <td>{item.batch_no}</td>
+                    <td>{batchLabelMap[item.batch_no] || item.batch_no}</td>
                     <td>{formatNumber(item.chicksIn ?? 0, 0)}</td>
                     <td>{formatNumber(item.chicksOut ?? 0, 0)}</td>
                     <td>{formatNumber(item.totalFeedBags ?? 0, 2)}</td>

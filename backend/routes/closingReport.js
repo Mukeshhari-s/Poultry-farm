@@ -17,6 +17,48 @@ function safeNum(v) {
   return Number(v || 0);
 }
 
+// Map production cost per kg to G.C / kg based on user-provided slabs
+function computeGcPerKgFromProductionCost(costPerKg) {
+  const v = Number(costPerKg);
+  if (!Number.isFinite(v)) return null;
+
+  if (v <= 69.99) return 16.0;
+  if (v <= 70.5) return 13.8;
+  if (v <= 71.0) return 13.4;
+  if (v <= 71.5) return 13.0;
+  if (v <= 72.0) return 12.6;
+  if (v <= 72.5) return 12.2;
+  if (v <= 73.0) return 11.8;
+  if (v <= 73.5) return 11.4;
+  if (v <= 74.0) return 11.15;
+  if (v <= 74.5) return 10.9;
+  if (v <= 75.0) return 10.65;
+  if (v <= 75.5) return 10.4;
+  if (v <= 76.0) return 10.15;
+  if (v <= 76.5) return 9.9;
+  if (v <= 77.0) return 9.65;
+  if (v <= 77.5) return 9.4;
+  if (v <= 78.0) return 9.2;
+  if (v <= 78.5) return 9.0;
+  if (v <= 79.0) return 8.8;
+  if (v <= 79.5) return 8.6;
+  if (v <= 80.0) return 8.4;
+  if (v <= 80.5) return 8.2;
+  if (v <= 81.0) return 8.0;
+  if (v <= 81.5) return 7.8;
+  if (v <= 82.0) return 7.65;
+  if (v <= 82.5) return 7.5;
+  if (v <= 83.0) return 7.35;
+  if (v <= 83.5) return 7.2;
+  if (v <= 84.0) return 7.1;
+  if (v <= 84.5) return 7.0;
+  if (v <= 85.0) return 6.9;
+  if (v <= 86.0) return 6.8;
+  if (v <= 87.0) return 6.7;
+  if (v <= 88.0) return 6.6;
+  return 6.5; // 88.01 and over
+}
+
 async function buildClosingReport(ownerId, flockId) {
   const flockQuery = flockId ? { _id: flockId, owner: ownerId } : { owner: ownerId };
   const flock = await Flock.findOne(flockQuery).lean();
@@ -142,7 +184,9 @@ async function buildClosingReport(ownerId, flockId) {
   const shortExcess = totalBirdsSold - expectedBirdsSold;
   const totalFeedIntakeKg = totalFeedIn - totalFeedOut;
   // Cumulative feed per bird uses netFeedKg (feed in - feed out, excluding daily usage)
+  console.log('DEBUG: netFeedKg =', netFeedKg, 'balanceChicks =', balanceChicks, 'summaryFeedInKg =', summaryFeedInKg, 'summaryFeedOutKg =', summaryFeedOutKg);
   const cumulativeFeedPerBird = balanceChicks > 0 ? netFeedKg / balanceChicks : null;
+  console.log('DEBUG: cumulativeFeedPerBird =', cumulativeFeedPerBird);
   const chickCostTotal = totalChickCost;
   // Feed cost based on net feed (same as Feed page net amount)
   const feedCostTotal = netFeedCost;
@@ -150,6 +194,7 @@ async function buildClosingReport(ownerId, flockId) {
   const overhead = totalChicks * 6;
   const totalCost = chickCostTotal + feedCostTotal + medicineCostTotal + overhead;
   const productionCost = totalWeightSold > 0 ? totalCost / totalWeightSold : null;
+  const gcPerKg = productionCost != null ? computeGcPerKgFromProductionCost(productionCost) : null;
   // FCR = Feed in kg (net) / Weight of total birds (kg)
   const fcr = totalWeightSold > 0 ? netFeedKg / totalWeightSold : null;
 
@@ -174,7 +219,7 @@ async function buildClosingReport(ownerId, flockId) {
     overhead,
     totalCost,
     productionCost,
-    gcPerKg: null,
+    gcPerKg,
     totalGc: null,
     tds: null,
     netGc: null,
@@ -321,5 +366,8 @@ router.get('/:flockId/pdf', async (req, res) => {
     res.status(500).json({ error: 'Unable to build PDF', details: err.message });
   }
 });
+
+// Expose helper for other routes (e.g. dashboard summary)
+router.buildClosingReport = buildClosingReport;
 
 module.exports = router;

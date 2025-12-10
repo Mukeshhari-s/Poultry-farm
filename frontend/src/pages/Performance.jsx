@@ -104,6 +104,7 @@ export default function Performance() {
 		const netFeedInKg = data?.netFeedKg ?? ((data?.totalFeedIn ?? 0) - (data?.totalFeedOut ?? 0));
 		// FCR = Feed in kg / Weight of total birds (kg)
 		const fcrDisplay = totalBirdWeight > 0 ? netFeedInKg / totalBirdWeight : null;
+		const gcPerKg = performance.gcPerKg;
 		return [
 			{ label: "Housed chicks", value: formatNumber(performance.housedChicks ?? data?.totalChicks, 0) },
 			{ label: "Feed in kg", value: formatNumber(netFeedInKg, 2) },
@@ -123,7 +124,7 @@ export default function Performance() {
 			{ label: "Over head", value: formatNumber(performance.overhead, 2) },
 			{ label: "Total cost", value: formatNumber(performance.totalCost, 2) },
 			{ label: "Production cost", value: formatNumber(performance.productionCost, 2) },
-			{ label: "G.C", value: gcPlaceholder },
+			{ label: "G.C", value: gcPerKg != null ? formatNumber(gcPerKg, 2) : gcPlaceholder },
 			{ label: "Total", value: gcPlaceholder },
 			{ label: "TDS (1%)", value: gcPlaceholder },
 			{ label: "Net G.C", value: gcPlaceholder },
@@ -155,7 +156,7 @@ export default function Performance() {
 			const response = await reportApi.finalPdf(selectedFlockId);
 			const blob = new Blob([response.data], { type: "application/pdf" });
 			const url = window.URL.createObjectURL(blob);
-			const filename = `${selectedFlock?.batch_no || selectedFlockId}-performance.pdf`;
+			const filename = `${selectedFlock?.displayLabel || selectedFlock?.batch_no || selectedFlockId}-performance.pdf`;
 			const link = document.createElement("a");
 			link.href = url;
 			link.download = filename;
@@ -184,7 +185,7 @@ export default function Performance() {
 					<div className="card-header" style={{ alignItems: "center" }}>
 						<div>
 							<h2>Batch status</h2>
-							<p className="muted">{selectedFlock.batch_no}</p>
+							<p className="muted">{selectedFlock.displayLabel || selectedFlock.batch_no}</p>
 						</div>
 						<div className={`stat-pill ${readinessTone}`}>
 							{readinessLabel}
