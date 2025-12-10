@@ -194,7 +194,7 @@ router.get('/dashboard/summary', async (req, res) => {
     const summary = [];
 
     // Reuse closing report calculations so dashboard feed values
-    // exactly match Performance and Feed pages
+    // and final amount exactly match Performance and Feed pages
     for (const flock of flocks) {
       const report = await closingReportRouter.buildClosingReport(ownerId, flock._id);
       if (!report) continue;
@@ -203,6 +203,8 @@ router.get('/dashboard/summary', async (req, res) => {
       const feedUsedBags = feedUsedKg > 0 ? safeNum(feedUsedKg / KG_PER_BAG) : 0;
       const chicksOut = safeNum(report.totalBirdsSold);
       const totalWeightKg = safeNum(report.totalWeightSold);
+      const perf = report.performance || {};
+      const finalAmount = safeNum(perf.finalAmount ?? perf.netGc ?? 0);
 
       summary.push({
         batch_no: flock.batch_no,
@@ -211,7 +213,7 @@ router.get('/dashboard/summary', async (req, res) => {
         totalFeedKg: feedUsedKg,
         totalFeedBags: Number(feedUsedBags.toFixed(2)),
         totalWeightKg: Number(totalWeightKg.toFixed(3)),
-        finalAmount: null,
+        finalAmount,
         status: flock.status,
       });
     }

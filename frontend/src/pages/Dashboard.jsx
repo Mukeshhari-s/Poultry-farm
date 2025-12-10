@@ -320,7 +320,7 @@ export default function Dashboard() {
                     <td>{formatNumber(item.totalFeedBags ?? 0, 2)}</td>
                     <td>{formatNumber(item.totalFeedKg ?? 0, 2)}</td>
                     <td>{formatNumber(item.totalWeightKg ?? 0, 3)}</td>
-                    <td>-</td>
+                    <td>{item.finalAmount != null ? formatNumber(item.finalAmount, 2) : '-'}</td>
                   </tr>
                 ))}
               </tbody>
