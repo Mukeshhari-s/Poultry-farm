@@ -335,6 +335,18 @@ router.get('/:flockId/pdf', async (req, res) => {
     if (!report) return res.status(404).json({ error: 'Flock/batch not found' });
     const perf = report.performance || {};
     const validation = report.validation || {};
+    // Derive a human-friendly batch label (Batch 1, Batch 2, ...) similar to the frontend
+    let batchLabel = report.flock.batch_no || 'Batch';
+    try {
+      const allFlocks = await Flock.find({ owner: ownerId }).sort({ createdAt: -1 }).select('_id').lean();
+      const idx = allFlocks.findIndex((f) => String(f._id) === String(report.flock._id));
+      if (idx >= 0) {
+        const displayNumber = allFlocks.length - idx;
+        batchLabel = `Batch ${displayNumber}`;
+      }
+    } catch (labelErr) {
+      console.warn('closing-report pdf: unable to compute batch label, falling back to batch_no', labelErr);
+    }
     const formatNum = (value, decimals = 2) => {
       const num = Number(value);
       if (!Number.isFinite(num)) return String(value ?? '-');
@@ -347,13 +359,14 @@ router.get('/:flockId/pdf', async (req, res) => {
       return `${num >= 0 ? '+' : '-'}${formatted}`;
     };
     const doc = new PDFDocument({ margin: 50 });
-    const filename = `${report.flock.batch_no || 'performance-report'}.pdf`;
+    const filename = `${batchLabel || report.flock.batch_no || 'performance-report'}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
     doc.pipe(res);
     doc.fontSize(18).text('Batch Performance Report', { align: 'center' });
     doc.moveDown();
-    doc.fontSize(12).text(`Batch: ${report.flock.batch_no || 'N/A'}`);
+    doc.fontSize(12).text(`Batch: ${batchLabel}`);
+    doc.fontSize(12).text(`User: ${userName}`);
     doc.text(`Start date: ${report.flock.start_date ? new Date(report.flock.start_date).toLocaleDateString() : 'N/A'}`);
     doc.text(`Status: ${report.flock.status || 'active'}`);
     doc.text(`Records captured: ${report.rows?.length || 0}`);
@@ -368,14 +381,14 @@ router.get('/:flockId/pdf', async (req, res) => {
       ['Total birds sold', formatNum(perf.totalBirdsSales ?? report.totalBirdsSold, 0)],
       ['Total bird weight (kg)', formatNum(perf.weightOfTotalBirds ?? report.totalWeightSold, 3)],
       ['Avg weight (kg)', formatNum(perf.avgWeight ?? report.avgWeightPerBird, 3)],
-      ['Day gain (g/bird/day)', perf.dayGain != null ? formatNum(perf.dayGain, 2) : '-'],
+      ['Day gain', perf.dayGain != null ? formatNum(perf.dayGain, 2) : '-'],
       ['Cumulative feed per bird (kg)', formatNum(perf.cumulativeFeedPerBird ?? report.cumulativeFeedPerBird, 3)],
       ['Short / Excess (+/-)', formatSigned(perf.shortExcess ?? 0, 0)],
       ['Mean sale age (days)', formatNum(perf.meanAge, 2)],
       ['FCR', formatNum(perf.fcr, 3)],
       ['EEF', perf.eef != null ? formatNum(perf.eef, 2) : '-'],
       ['Chick cost', formatNum(perf.chickCost ?? report.totalChickCost, 2)],
-        ['Feed cost', formatNum(perf.feedCost ?? report.netFeedCost ?? (report.totalFeedCostIn - report.totalFeedCostOut), 2)],
+      ['Feed cost', formatNum(perf.feedCost ?? report.netFeedCost ?? (report.totalFeedCostIn - report.totalFeedCostOut), 2)],
       ['Medicine cost', formatNum(perf.medicineCost ?? report.totalMedicineCost, 2)],
       ['Overhead', formatNum(perf.overhead, 2)],
       ['Total cost', formatNum(perf.totalCost, 2)],
@@ -400,10 +413,6 @@ router.get('/:flockId/pdf', async (req, res) => {
         0
       )}, tolerance ±${validation.tolerance || SALES_TOLERANCE})`
     );
-    doc.moveDown();
-    doc.fontSize(12).text('Notes');
-    doc.fontSize(10).text('G.C related values depend on manual input and are left blank intentionally.');
-    doc.end();
   } catch (err) {
     console.error('closing report pdf error', err);
     res.status(500).json({ error: 'Unable to build PDF', details: err.message });
