@@ -186,6 +186,16 @@ async function buildClosingReport(ownerId, flockId) {
   }
   const meanSaleAge = totalBirdsSold > 0 && weightedAgeSum > 0 ? weightedAgeSum / totalBirdsSold : null;
 
+  // Day gain = average weight (kg) * 1000 / mean age (days)
+  // Result is grams gained per bird per day
+  let dayGain = null;
+  if (meanSaleAge != null && meanSaleAge > 0 && avgWeightPerBird > 0) {
+    const raw = (avgWeightPerBird * 1000) / meanSaleAge;
+    if (Number.isFinite(raw)) {
+      dayGain = raw;
+    }
+  }
+
   const expectedBirdsSold = balanceChicks;
   const shortExcess = totalBirdsSold - expectedBirdsSold;
   const totalFeedIntakeKg = totalFeedIn - totalFeedOut;
@@ -238,6 +248,7 @@ async function buildClosingReport(ownerId, flockId) {
     totalBirdsSales: totalBirdsSold,
     weightOfTotalBirds: totalWeightSold,
     avgWeight: avgWeightPerBird,
+    dayGain,
     shortExcess,
     expectedBirdsSold,
     meanAge: meanSaleAge,
@@ -357,6 +368,7 @@ router.get('/:flockId/pdf', async (req, res) => {
       ['Total birds sold', formatNum(perf.totalBirdsSales ?? report.totalBirdsSold, 0)],
       ['Total bird weight (kg)', formatNum(perf.weightOfTotalBirds ?? report.totalWeightSold, 3)],
       ['Avg weight (kg)', formatNum(perf.avgWeight ?? report.avgWeightPerBird, 3)],
+      ['Day gain (g/bird/day)', perf.dayGain != null ? formatNum(perf.dayGain, 2) : '-'],
       ['Cumulative feed per bird (kg)', formatNum(perf.cumulativeFeedPerBird ?? report.cumulativeFeedPerBird, 3)],
       ['Short / Excess (+/-)', formatSigned(perf.shortExcess ?? 0, 0)],
       ['Mean sale age (days)', formatNum(perf.meanAge, 2)],
