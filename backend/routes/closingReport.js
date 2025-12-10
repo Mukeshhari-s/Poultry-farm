@@ -195,6 +195,10 @@ async function buildClosingReport(ownerId, flockId) {
   const totalCost = chickCostTotal + feedCostTotal + medicineCostTotal + overhead;
   const productionCost = totalWeightSold > 0 ? totalCost / totalWeightSold : null;
   const gcPerKg = productionCost != null ? computeGcPerKgFromProductionCost(productionCost) : null;
+  const totalGc = gcPerKg != null && totalWeightSold > 0 ? gcPerKg * totalWeightSold : null;
+  const tds = totalGc != null ? totalGc * 0.01 : null; // 1% TDS
+  const netGc = totalGc != null && tds != null ? totalGc - tds : null;
+  const finalAmount = netGc;
   // FCR = Feed in kg (net) / Weight of total birds (kg)
   const fcr = totalWeightSold > 0 ? netFeedKg / totalWeightSold : null;
 
@@ -220,10 +224,10 @@ async function buildClosingReport(ownerId, flockId) {
     totalCost,
     productionCost,
     gcPerKg,
-    totalGc: null,
-    tds: null,
-    netGc: null,
-    finalAmount: null,
+    totalGc,
+    tds,
+    netGc,
+    finalAmount,
   };
 
   const hasMinRecords = rows.length >= MIN_RECORD_DAYS;

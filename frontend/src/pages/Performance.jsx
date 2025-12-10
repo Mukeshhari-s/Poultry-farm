@@ -105,6 +105,10 @@ export default function Performance() {
 		// FCR = Feed in kg / Weight of total birds (kg)
 		const fcrDisplay = totalBirdWeight > 0 ? netFeedInKg / totalBirdWeight : null;
 		const gcPerKg = performance.gcPerKg;
+		const totalGc = performance.totalGc;
+		const tds = performance.tds;
+		const netGc = performance.netGc;
+		const finalAmount = performance.finalAmount;
 		return [
 			{ label: "Housed chicks", value: formatNumber(performance.housedChicks ?? data?.totalChicks, 0) },
 			{ label: "Feed in kg", value: formatNumber(netFeedInKg, 2) },
@@ -125,10 +129,10 @@ export default function Performance() {
 			{ label: "Total cost", value: formatNumber(performance.totalCost, 2) },
 			{ label: "Production cost", value: formatNumber(performance.productionCost, 2) },
 			{ label: "G.C", value: gcPerKg != null ? formatNumber(gcPerKg, 2) : gcPlaceholder },
-			{ label: "Total", value: gcPlaceholder },
-			{ label: "TDS (1%)", value: gcPlaceholder },
-			{ label: "Net G.C", value: gcPlaceholder },
-			{ label: "Final amount", value: gcPlaceholder },
+			{ label: "Total", value: totalGc != null ? formatNumber(totalGc, 2) : gcPlaceholder },
+			{ label: "TDS (1%)", value: tds != null ? formatNumber(tds, 2) : gcPlaceholder },
+			{ label: "Net G.C", value: netGc != null ? formatNumber(netGc, 2) : gcPlaceholder },
+			{ label: "Final amount", value: finalAmount != null ? formatNumber(finalAmount, 2) : gcPlaceholder },
 		];
 	}, [performance, data]);
 
