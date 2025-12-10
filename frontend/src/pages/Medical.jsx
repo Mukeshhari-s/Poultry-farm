@@ -6,24 +6,29 @@ import { createBatchLabelMap, getTodayISO, formatIndiaDate } from "../utils/help
 const today = getTodayISO();
 
 export default function Medical() {
-	const { flocks } = useFlocks();
+	const { flocks, loading: flocksLoading, refreshFlocks } = useFlocks();
 	const batchLabelMap = useMemo(() => createBatchLabelMap(flocks), [flocks]);
 	const activeFlocks = useMemo(() => flocks.filter((f) => f.status === "active"), [flocks]);
 	const activeBatchNos = useMemo(
 		() => new Set(flocks.filter((f) => f.status === "active").map((f) => f.batch_no)),
 		[flocks]
 	);
+	const [selectedBatch, setSelectedBatch] = useState("");
 	const [records, setRecords] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
 	const [success, setSuccess] = useState("");
+	const filteredRecords = useMemo(
+		() => (selectedBatch ? records.filter((rec) => rec.batch_no === selectedBatch) : records),
+		[records, selectedBatch]
+	);
 	const cumulativeMedicineCost = useMemo(() => {
-		return records.reduce((acc, rec) => {
+		return filteredRecords.reduce((acc, rec) => {
 			const cost = Number(rec.totalCost || 0);
 			if (!Number.isFinite(cost) || cost <= 0) return acc;
 			return acc + cost;
 		}, 0);
-	}, [records]);
+	}, [filteredRecords]);
 	const computeTotalCost = (quantity, unitPrice) => {
 		const qty = Number(quantity || 0);
 		const price = Number(unitPrice || 0);
@@ -60,6 +65,24 @@ export default function Medical() {
 	useEffect(() => {
 		fetchRecords();
 	}, []);
+
+	useEffect(() => {
+		// Prefer an active batch; if none exist, fall back to the latest flock
+		if (!selectedBatch) {
+			if (activeFlocks.length > 0) {
+				setSelectedBatch(activeFlocks[0].batch_no);
+			} else if (flocks.length > 0) {
+				setSelectedBatch(flocks[0].batch_no);
+			}
+			return;
+		}
+		// If current selection becomes inactive but another active batch exists,
+		// automatically move view to the first active batch.
+		if (!activeFlocks.length) return;
+		if (!activeFlocks.some((f) => f.batch_no === selectedBatch)) {
+			setSelectedBatch(activeFlocks[0].batch_no);
+		}
+	}, [activeFlocks, flocks, selectedBatch]);
 
 	const onChange = (e) => {
 		const { name, value } = e.target;
@@ -119,6 +142,7 @@ export default function Medical() {
 				});
 				setSuccess("Medicine saved.");
 			}
+			setSelectedBatch(form.batch_no);
 			setForm({
 				batch_no: form.batch_no,
 				date: today,
@@ -144,6 +168,7 @@ export default function Medical() {
 			return;
 		}
 		setEditingRecord(rec);
+		setSelectedBatch(rec.batch_no || "");
 		setForm({
 			batch_no: rec.batch_no,
 			date: formatIndiaDate(rec.date) || today,
@@ -189,6 +214,9 @@ export default function Medical() {
 					<h1>Medicine log</h1>
 					<p>Track medicine usage per batch.</p>
 				</div>
+				<button onClick={refreshFlocks} disabled={flocksLoading}>
+					{flocksLoading ? "Refreshing..." : "Refresh batches"}
+				</button>
 			</div>
 
 			{error && <div className="error mb">{error}</div>}
@@ -283,14 +311,14 @@ export default function Medical() {
 							</tr>
 						</thead>
 						<tbody>
-							{records.length === 0 && (
+							{filteredRecords.length === 0 && (
 								<tr>
 									<td colSpan="8" style={{ textAlign: "center" }}>
 										{loading ? "Loading..." : "No records yet"}
 									</td>
 								</tr>
 							)}
-							{records.map((rec) => {
+							{filteredRecords.map((rec) => {
 								const canEdit = activeBatchNos.has(rec.batch_no);
 								return (
 									<tr key={rec._id}>

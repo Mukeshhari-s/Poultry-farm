@@ -13,8 +13,9 @@ export default function Chicks() {
   const [success, setSuccess] = useState("");
   const [editingFlock, setEditingFlock] = useState(null);
 
-  const batchesCount = useMemo(() => flocks.length, [flocks]);
-  const hasActiveBatch = useMemo(() => flocks.some((f) => f.status === "active"), [flocks]);
+  const activeFlocks = useMemo(() => flocks.filter((f) => f.status === "active"), [flocks]);
+  const batchesCount = useMemo(() => activeFlocks.length, [activeFlocks]);
+  const hasActiveBatch = useMemo(() => activeFlocks.length > 0, [activeFlocks]);
 
   const fetchFlocks = async () => {
     setLoading(true);
@@ -193,14 +194,14 @@ export default function Chicks() {
               </tr>
             </thead>
             <tbody>
-              {flocks.length === 0 && (
+              {activeFlocks.length === 0 && (
                 <tr>
                   <td colSpan="6" style={{ textAlign: "center" }}>
                     {loading ? "Loading..." : "No batches yet"}
                   </td>
                 </tr>
               )}
-              {flocks.map((flock) => (
+              {activeFlocks.map((flock) => (
                 <tr key={flock._id}>
                   <td>{flock.displayLabel || flock.batch_no || "-"}</td>
                   <td>{formatIndiaDate(flock.start_date) || "-"}</td>

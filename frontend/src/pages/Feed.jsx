@@ -50,7 +50,7 @@ const defaultOutForm = {
 };
 
 export default function Feed() {
-	const { flocks } = useFlocks();
+	const { flocks, loading: flocksLoading, refreshFlocks } = useFlocks();
 	const activeFlocks = useMemo(() => flocks.filter((f) => f.status === "active"), [flocks]);
 	const activeFlockIds = useMemo(
 		() => new Set(flocks.filter((f) => f.status === "active").map((f) => String(f._id))),
@@ -93,12 +93,27 @@ export default function Feed() {
 		flockId: "",
 	});
 	const [savingEdit, setSavingEdit] = useState(false);
+	const selectedFlockDoc = useMemo(
+		() => flocks.find((f) => String(f._id) === String(selectedFlock)),
+		[flocks, selectedFlock]
+	);
+	const selectedBatchNo = selectedFlockDoc?.batch_no;
+	const visibleFeedLogs = useMemo(
+		() =>
+			selectedBatchNo
+				? feedLogs.filter((log) =>
+						String(log.batch_no || "") === String(selectedBatchNo) ||
+						String(log.flockId || "") === String(selectedFlock)
+				  )
+				: feedLogs,
+		[feedLogs, selectedBatchNo, selectedFlock]
+	);
 	const feedOutAvailable = useMemo(
-		() => calculateAvailableFeed(feedLogs, feedOutForm.flockId),
-		[feedLogs, feedOutForm.flockId]
+		() => calculateAvailableFeed(visibleFeedLogs, null),
+		[visibleFeedLogs]
 	);
 	const cumulativeFeedStats = useMemo(() => {
-		const totals = feedLogs.reduce(
+		const totals = visibleFeedLogs.reduce(
 			(acc, log) => {
 				const kgIn = Number(log.kgIn || 0);
 				const kgOut = Number(log.kgOut || 0);
@@ -133,7 +148,7 @@ export default function Feed() {
 			totalOutBags,
 			totalAmountDiff,
 		};
-	}, [feedLogs]);
+	}, [visibleFeedLogs]);
 	const feedInTotalKg = useMemo(() => {
 		const total = Number(feedInForm.bagsIn || 0) * Number(feedInForm.kgPerBag || 0);
 		if (!Number.isFinite(total)) return 0;
@@ -458,6 +473,9 @@ export default function Feed() {
 					<h1>Feed Management</h1>
 					<p>Track feed stock entering and leaving the farm.</p>
 				</div>
+				<button onClick={refreshFlocks} disabled={flocksLoading}>
+					{flocksLoading ? "Refreshing..." : "Refresh batches"}
+				</button>
 			</div>
 
 			{error && <div className="error mb">{error}</div>}
@@ -786,14 +804,14 @@ export default function Feed() {
 							</tr>
 						</thead>
 						<tbody>
-							{feedLogs.length === 0 && (
+							{visibleFeedLogs.length === 0 && (
 								<tr>
 									<td colSpan="11" style={{ textAlign: "center" }}>
 										{loading ? "Loading..." : "No feed entries"}
 									</td>
 								</tr>
 							)}
-							{feedLogs.map((log) => {
+							{visibleFeedLogs.map((log) => {
 								const isEditable =
 									(log.flockId && activeFlockIds.has(String(log.flockId))) ||
 									(log.batch_no && activeBatchNos.has(String(log.batch_no)));
