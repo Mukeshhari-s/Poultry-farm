@@ -30,6 +30,7 @@ export const flockApi = {
 	create: (payload) => unwrap(api.post("/flocks", payload)),
 	update: (id, payload) => unwrap(api.patch(`/flocks/${id}`, payload)),
 	close: (id, payload = {}) => unwrap(api.patch(`/flocks/${id}/close`, payload)),
+	reopen: (id) => unwrap(api.patch(`/flocks/${id}/reopen`)),
 	dashboardSummary: () => unwrap(api.get("/flocks/dashboard/summary")),
 };
 

@@ -40,6 +40,7 @@ const formatFeedBags = (kgValue) => {
 
 export default function DailyMonitoring() {
 	const { flocks } = useFlocks();
+	const activeFlocks = useMemo(() => flocks.filter((f) => f.status === "active"), [flocks]);
 	const [selectedBatch, setSelectedBatch] = useState("");
 	const [form, setForm] = useState(() => createDefaultDailyForm());
 	const [saving, setSaving] = useState(false);
@@ -64,6 +65,7 @@ export default function DailyMonitoring() {
 		() => flocks.find((f) => f.batch_no === selectedBatch),
 		[flocks, selectedBatch]
 	);
+	const isSelectedActive = selectedFlock?.status === "active";
 	const batchStartDate = useMemo(() => {
 		if (!selectedFlock?.start_date) return "";
 		return formatIndiaDate(selectedFlock.start_date);
@@ -73,10 +75,22 @@ export default function DailyMonitoring() {
 	const entriesUpToDate = Boolean(reportMeta?.dailyCompleteThroughToday);
 
 	useEffect(() => {
-		if (!selectedBatch && flocks.length > 0) {
-			setSelectedBatch(flocks[0].batch_no);
+		// If there is an active batch, prefer it; otherwise fall back to latest flock
+		if (!selectedBatch) {
+			if (activeFlocks.length > 0) {
+				setSelectedBatch(activeFlocks[0].batch_no);
+			} else if (flocks.length > 0) {
+				setSelectedBatch(flocks[0].batch_no);
+			}
+			return;
 		}
-	}, [flocks, selectedBatch]);
+		// If we already have a selection and it becomes inactive but another active batch exists,
+		// automatically move view to the first active batch.
+		if (!activeFlocks.length) return;
+		if (!activeFlocks.some((f) => f.batch_no === selectedBatch)) {
+			setSelectedBatch(activeFlocks[0].batch_no);
+		}
+	}, [activeFlocks, flocks, selectedBatch]);
 
 	useEffect(() => {
 		setForm((prev) => {
@@ -149,6 +163,10 @@ export default function DailyMonitoring() {
 			setError("Select a batch first");
 			return;
 		}
+		if (!isSelectedActive) {
+			setError("Daily entries cannot be added for a closed batch.");
+			return;
+		}
 		if (!form.date) {
 			setError("Pick a date for the entry.");
 			return;
@@ -219,6 +237,10 @@ export default function DailyMonitoring() {
 	const onEditSubmit = async (e) => {
 		e.preventDefault();
 		if (!editingRow) return;
+		if (!isSelectedActive) {
+			setError("Daily entries for closed batches cannot be edited.");
+			return;
+		}
 		setSavingEdit(true);
 		setError("");
 		setSuccess("");
@@ -250,7 +272,7 @@ export default function DailyMonitoring() {
 				</div>
 				<select value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)}>
 					<option value="">Select batch</option>
-					{flocks.map((f) => (
+					{(activeFlocks.length > 0 ? activeFlocks : flocks).map((f) => (
 						<option key={f._id} value={f.batch_no}>
 							{f.displayLabel || f.batch_no}
 						</option>
@@ -297,7 +319,10 @@ export default function DailyMonitoring() {
 						<input type="number" min="0" step="0.01" name="avgWeight" value={form.avgWeight} onChange={onChange} />
 					</label>
 					<div className="grid-full">
-						<button type="submit" disabled={saving || dateOutOfRange || hasEntryForSelectedDate}>
+						<button
+							type="submit"
+							disabled={!isSelectedActive || saving || dateOutOfRange || hasEntryForSelectedDate}
+						>
 							{saving ? "Saving..." : "Save entry"}
 						</button>
 					</div>
@@ -334,7 +359,7 @@ export default function DailyMonitoring() {
 							<input type="number" min="0" step="0.01" name="avgWeight" value={editForm.avgWeight} onChange={onEditChange} />
 						</label>
 						<div className="grid-full" style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-							<button type="submit" disabled={savingEdit}>
+							<button type="submit" disabled={!isSelectedActive || savingEdit}>
 								{savingEdit ? "Saving..." : "Update entry"}
 							</button>
 							<button type="button" className="ghost" onClick={cancelEdit}>
@@ -393,9 +418,11 @@ export default function DailyMonitoring() {
 										<td>{formatFeedPerBird(row.cumulativeFeedPerBird)}</td>
 										<td>{row.avgWeight ?? "-"}</td>
 										<td>
-											<button type="button" className="link" onClick={() => startEdit(row)}>
-												Edit
-											</button>
+											{isSelectedActive && (
+												<button type="button" className="link" onClick={() => startEdit(row)}>
+													Edit
+												</button>
+											)}
 										</td>
 									</tr>
 								);

@@ -25,6 +25,7 @@ const computeNetWeight = (load, empty) => {
 
 export default function Sales() {
 	const { flocks } = useFlocks();
+	const activeFlocks = useMemo(() => flocks.filter((f) => f.status === "active"), [flocks]);
 	const [selectedBatch, setSelectedBatch] = useState("");
 	const [records, setRecords] = useState([]);
 	const [summary, setSummary] = useState(null);
@@ -36,6 +37,12 @@ export default function Sales() {
 	const [editingSale, setEditingSale] = useState(null);
 	const [editForm, setEditForm] = useState(emptySaleForm);
 	const [savingEdit, setSavingEdit] = useState(false);
+
+	const selectedFlock = useMemo(
+		() => flocks.find((f) => f.batch_no === selectedBatch),
+		[flocks, selectedBatch]
+	);
+	const isSelectedActive = selectedFlock?.status === "active";
 
 	const saleStats = useMemo(() => {
 		if (!records.length) {
@@ -75,10 +82,20 @@ export default function Sales() {
 	};
 
 	useEffect(() => {
-		if (!selectedBatch && flocks.length > 0) {
-			setSelectedBatch(flocks[0].batch_no);
+		// Prefer an active batch; if none exist, fall back to latest flock
+		if (!selectedBatch) {
+			if (activeFlocks.length > 0) {
+				setSelectedBatch(activeFlocks[0].batch_no);
+			} else if (flocks.length > 0) {
+				setSelectedBatch(flocks[0].batch_no);
+			}
+			return;
 		}
-	}, [flocks, selectedBatch]);
+		if (!activeFlocks.length) return;
+		if (!activeFlocks.some((f) => f.batch_no === selectedBatch)) {
+			setSelectedBatch(activeFlocks[0].batch_no);
+		}
+	}, [activeFlocks, flocks, selectedBatch]);
 
 	useEffect(() => {
 		if (selectedBatch) fetchSales(selectedBatch);
@@ -108,6 +125,10 @@ export default function Sales() {
 		setSuccess("");
 		if (!selectedBatch) {
 			setError("Select a batch first");
+			return;
+		}
+		if (!isSelectedActive) {
+			setError("Sales cannot be added for a closed batch.");
 			return;
 		}
 		const cagesValue = Number(form.cages || 0);
@@ -160,6 +181,11 @@ export default function Sales() {
 	const onEditChange = buildFormChangeHandler(setEditForm);
 
 	const startEdit = (sale) => {
+		if (!isSelectedActive) {
+			setError("Sales for closed batches cannot be edited.");
+			setSuccess("");
+			return;
+		}
 		setEditingSale(sale);
 		const normalizedEmpty =
 			sale.empty_weight === undefined || sale.empty_weight === null
@@ -258,7 +284,7 @@ export default function Sales() {
 				</div>
 				<select value={selectedBatch} onChange={(e) => setSelectedBatch(e.target.value)}>
 					<option value="">Select batch</option>
-					{flocks.map((f) => (
+					{(activeFlocks.length > 0 ? activeFlocks : flocks).map((f) => (
 						<option key={f._id} value={f.batch_no}>
 							{f.displayLabel || f.batch_no}
 						</option>
@@ -343,7 +369,7 @@ export default function Sales() {
 						/>
 					</label>
 					<div className="grid-full">
-						<button type="submit" disabled={saving}>
+						<button type="submit" disabled={!isSelectedActive || saving}>
 							{saving ? "Saving..." : "Save sale"}
 						</button>
 					</div>
@@ -407,7 +433,7 @@ export default function Sales() {
 							/>
 						</label>
 						<div className="grid-full" style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-							<button type="submit" disabled={savingEdit}>
+							<button type="submit" disabled={!isSelectedActive || savingEdit}>
 								{savingEdit ? "Saving..." : "Update sale"}
 							</button>
 							<button type="button" className="ghost" onClick={cancelEdit}>
@@ -430,13 +456,14 @@ export default function Sales() {
 								<th>Birds</th>
 								<th>Weight (kg)</th>
 								<th>Avg weight/bird (kg)</th>
+								<th>Age (days)</th>
 								<th>Actions</th>
 							</tr>
 						</thead>
 						<tbody>
 							{records.length === 0 && (
 								<tr>
-									<td colSpan="7" style={{ textAlign: "center" }}>
+									<td colSpan="8" style={{ textAlign: "center" }}>
 										{loading ? "Loading..." : "No sale entries"}
 									</td>
 								</tr>
@@ -445,6 +472,24 @@ export default function Sales() {
 								const avgWeight = Number(sale.birds) > 0
 									? Number(sale.total_weight || 0) / Number(sale.birds || 1)
 									: 0;
+								let ageDisplay = "-";
+								if (selectedFlock?.start_date && sale.date) {
+									const start = new Date(selectedFlock.start_date);
+									const saleDate = new Date(sale.date);
+									if (!Number.isNaN(start.getTime()) && !Number.isNaN(saleDate.getTime())) {
+										// Normalize to midnight for whole-day difference
+										start.setHours(0, 0, 0, 0);
+										saleDate.setHours(0, 0, 0, 0);
+										const diffMs = saleDate.getTime() - start.getTime();
+										const dayMs = 1000 * 60 * 60 * 24;
+										const days = diffMs / dayMs;
+										if (Number.isFinite(days) && days >= 0) {
+											// Age should be 1 on chick-in day, so add 1
+											const ageDays = Math.floor(days) + 1;
+											ageDisplay = ageDays.toString();
+										}
+									}
+								}
 								return (
 									<tr key={sale._id}>
 										<td>{formatIndiaDate(sale.date)}</td>
@@ -453,10 +498,13 @@ export default function Sales() {
 										<td>{sale.birds}</td>
 										<td>{sale.total_weight}</td>
 										<td>{avgWeight ? avgWeight.toFixed(3) : "-"}</td>
+										<td>{ageDisplay}</td>
 										<td>
-											<button type="button" className="link" onClick={() => startEdit(sale)}>
-												Edit
-											</button>
+											{isSelectedActive && (
+												<button type="button" className="link" onClick={() => startEdit(sale)}>
+													Edit
+												</button>
+											)}
 										</td>
 									</tr>
 								);

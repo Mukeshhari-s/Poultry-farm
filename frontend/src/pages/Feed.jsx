@@ -51,6 +51,15 @@ const defaultOutForm = {
 
 export default function Feed() {
 	const { flocks } = useFlocks();
+	const activeFlocks = useMemo(() => flocks.filter((f) => f.status === "active"), [flocks]);
+	const activeFlockIds = useMemo(
+		() => new Set(flocks.filter((f) => f.status === "active").map((f) => String(f._id))),
+		[flocks]
+	);
+	const activeBatchNos = useMemo(
+		() => new Set(flocks.filter((f) => f.status === "active").map((f) => String(f.batch_no))),
+		[flocks]
+	);
 	const batchLabelMap = useMemo(() => createBatchLabelMap(flocks), [flocks]);
 	const batchNoToFlockId = useMemo(() => {
 		const map = {};
@@ -195,17 +204,27 @@ export default function Feed() {
 	}, [selectedFlock]);
 
 	useEffect(() => {
-		if (selectedFlock || !flocks.length) return;
-		const preferred =
-			flocks.find((flock) => {
-				const label = flock?.batch_no;
-				if (label === undefined || label === null) return false;
-				return String(label).toLowerCase() === "batch 1";
-			}) || flocks[0];
-		if (preferred?._id) {
-			setSelectedFlock(preferred._id);
+		// Prefer an active batch; if none exist, fall back to the latest flock
+		if (!selectedFlock) {
+			const source = activeFlocks.length > 0 ? activeFlocks : flocks;
+			if (!source.length) return;
+			const preferred =
+				source.find((flock) => {
+					const label = flock?.batch_no;
+					if (label === undefined || label === null) return false;
+					return String(label).toLowerCase() === "batch 1";
+				}) || source[0];
+			if (preferred?._id) {
+				setSelectedFlock(preferred._id);
+			}
+			return;
 		}
-	}, [flocks, selectedFlock]);
+		if (!activeFlocks.length) return;
+		if (!activeFlocks.some((f) => f._id === selectedFlock)) {
+			// When a new active batch appears, move view to it instead of the old closed one
+			setSelectedFlock(activeFlocks[0]._id);
+		}
+	}, [activeFlocks, flocks, selectedFlock]);
 
 	useEffect(() => {
 		setFeedInForm((prev) => ({ ...prev, flockId: selectedFlock }));
@@ -563,7 +582,7 @@ export default function Feed() {
 								onChange={(e) => setSelectedFlock(e.target.value)}
 							>
 								<option value="">Select batch</option>
-								{flocks.map((f) => (
+								{activeFlocks.map((f) => (
 									<option key={f._id} value={f._id}>
 										{f.displayLabel || f.batch_no || f._id}
 									</option>
@@ -651,7 +670,7 @@ export default function Feed() {
 								onChange={(e) => setSelectedFlock(e.target.value)}
 							>
 								<option value="">Select batch</option>
-								{flocks.map((f) => (
+								{activeFlocks.map((f) => (
 									<option key={f._id} value={f._id}>
 										{f.displayLabel || f.batch_no || f._id}
 									</option>
@@ -758,6 +777,9 @@ export default function Feed() {
 								</tr>
 							)}
 							{feedLogs.map((log) => {
+								const isEditable =
+									(log.flockId && activeFlockIds.has(String(log.flockId))) ||
+									(log.batch_no && activeBatchNos.has(String(log.batch_no)));
 								const batchLabel = log.batch_no
 									? batchLabelMap[log.batch_no] || log.batch_no
 									: log.flockId
@@ -781,9 +803,11 @@ export default function Feed() {
 										<td>{totalCostDisplay}</td>
 										<td>{batchLabel || "-"}</td>
 										<td>
-											<button type="button" className="link" onClick={() => onEditFeed(log)}>
-												Edit
-											</button>
+											{isEditable && (
+												<button type="button" className="link" onClick={() => onEditFeed(log)}>
+													Edit
+												</button>
+											)}
 										</td>
 									</tr>
 								);

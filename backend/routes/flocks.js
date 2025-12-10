@@ -184,6 +184,38 @@ router.patch('/:id/close', async (req, res) => {
   }
 });
 
+// Reopen a previously closed flock (admin-style undo)
+router.patch('/:id/reopen', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ownerId = req.user._id;
+
+    const flock = await Flock.findOne({ _id: id, owner: ownerId });
+    if (!flock) return res.status(404).json({ error: 'Flock not found' });
+
+    if (flock.status !== 'closed') {
+      return res.status(400).json({ error: 'Batch is not closed' });
+    }
+
+    // Ensure only one active flock at a time
+    const otherActive = await Flock.findOne({ owner: ownerId, status: 'active', _id: { $ne: id } });
+    if (otherActive) {
+      const label = otherActive.batch_no || 'another active batch';
+      return res.status(400).json({ error: `Close ${label} before reopening this batch.` });
+    }
+
+    flock.status = 'active';
+    flock.closedAt = undefined;
+    flock.closeRemarks = undefined;
+
+    const saved = await flock.save();
+    res.json(saved);
+  } catch (err) {
+    console.error('Reopen flock error', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const KG_PER_BAG = 60;
 
 router.get('/dashboard/summary', async (req, res) => {

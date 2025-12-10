@@ -170,15 +170,21 @@ async function buildClosingReport(ownerId, flockId) {
   const remainingChicks = Math.max(0, totalChicks - lastCumulativeMort - totalBirdsSold);
 
   const startDate = flock.start_date ? new Date(flock.start_date) : null;
-  const saleAges = sales
-    .map((sale) => {
-      if (!startDate || !sale.date) return null;
-      const diff = new Date(sale.date).getTime() - startDate.getTime();
-      if (!Number.isFinite(diff) || diff < 0) return null;
-      return diff / MS_PER_DAY;
-    })
-    .filter((age) => Number.isFinite(age));
-  const meanSaleAge = saleAges.length ? saleAges.reduce((sum, age) => sum + age, 0) / saleAges.length : null;
+  // Mean sale age = (sum of (birds sold on each sale * age in days at that sale)) / total birds sold
+  let weightedAgeSum = 0;
+  if (startDate && sales.length && totalBirdsSold > 0) {
+    sales.forEach((sale) => {
+      if (!sale.date) return;
+      const birdsThisSale = safeNum(sale.birds || sale.count || sale.qty);
+      if (!birdsThisSale) return;
+      const diffMs = new Date(sale.date).getTime() - startDate.getTime();
+      if (!Number.isFinite(diffMs) || diffMs < 0) return;
+      const ageDays = diffMs / MS_PER_DAY;
+      if (!Number.isFinite(ageDays) || ageDays < 0) return;
+      weightedAgeSum += birdsThisSale * ageDays;
+    });
+  }
+  const meanSaleAge = totalBirdsSold > 0 && weightedAgeSum > 0 ? weightedAgeSum / totalBirdsSold : null;
 
   const expectedBirdsSold = balanceChicks;
   const shortExcess = totalBirdsSold - expectedBirdsSold;

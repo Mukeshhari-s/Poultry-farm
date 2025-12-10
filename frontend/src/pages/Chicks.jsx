@@ -92,6 +92,11 @@ export default function Chicks() {
   };
 
   const onEdit = (flock) => {
+    if (flock.status !== "active") {
+      setError("Closed batches cannot be edited.");
+      setSuccess("");
+      return;
+    }
     setEditingFlock(flock);
     setForm({
       start_date: formatIndiaDate(flock.start_date) || today,
@@ -203,9 +208,14 @@ export default function Chicks() {
                   <td>{flock.pricePerChick ? flock.pricePerChick.toFixed?.(2) ?? flock.pricePerChick : "-"}</td>
                   <td>{flock.status}</td>
                   <td>
-                    <button type="button" className="link" onClick={() => onEdit(flock)}>
-                      Edit
-                    </button>
+                        <button
+                          type="button"
+                          className="link"
+                          disabled={flock.status !== "active"}
+                          onClick={() => onEdit(flock)}
+                        >
+                          Edit
+                        </button>
                   </td>
                 </tr>
               ))}

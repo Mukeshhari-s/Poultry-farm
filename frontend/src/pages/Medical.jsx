@@ -8,6 +8,11 @@ const today = getTodayISO();
 export default function Medical() {
 	const { flocks } = useFlocks();
 	const batchLabelMap = useMemo(() => createBatchLabelMap(flocks), [flocks]);
+	const activeFlocks = useMemo(() => flocks.filter((f) => f.status === "active"), [flocks]);
+	const activeBatchNos = useMemo(
+		() => new Set(flocks.filter((f) => f.status === "active").map((f) => f.batch_no)),
+		[flocks]
+	);
 	const [records, setRecords] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState("");
@@ -132,6 +137,12 @@ export default function Medical() {
 	};
 
 	const onEditRecord = (rec) => {
+		// Prevent editing entries for closed batches
+		if (!activeBatchNos.has(rec.batch_no)) {
+			setError("Medicine entries for closed batches cannot be edited.");
+			setSuccess("");
+			return;
+		}
 		setEditingRecord(rec);
 		setForm({
 			batch_no: rec.batch_no,
@@ -173,7 +184,7 @@ export default function Medical() {
 						<span>Batch</span>
 						<select name="batch_no" value={form.batch_no} onChange={onChange}>
 							<option value="">Select batch</option>
-							{flocks.map((f) => (
+							{(editingRecord ? flocks : activeFlocks).map((f) => (
 								<option key={f._id} value={f.batch_no}>
 									{f.displayLabel || f.batch_no}
 								</option>
@@ -262,22 +273,27 @@ export default function Medical() {
 									</td>
 								</tr>
 							)}
-							{records.map((rec) => (
-								<tr key={rec._id}>
-									<td>{formatIndiaDate(rec.date)}</td>
-									<td>{batchLabelMap[rec.batch_no] || rec.batch_no}</td>
-									<td>{rec.medicine_name}</td>
-									<td>{rec.quantity}</td>
-									<td>{rec.unitPrice ? Number(rec.unitPrice).toFixed(2) : "-"}</td>
-									<td>{rec.totalCost ? Number(rec.totalCost).toFixed(2) : "-"}</td>
-									<td>{rec.dose}</td>
-									<td>
-										<button type="button" className="link" onClick={() => onEditRecord(rec)}>
-											Edit
-										</button>
-									</td>
-								</tr>
-							))}
+							{records.map((rec) => {
+								const canEdit = activeBatchNos.has(rec.batch_no);
+								return (
+									<tr key={rec._id}>
+										<td>{formatIndiaDate(rec.date)}</td>
+										<td>{batchLabelMap[rec.batch_no] || rec.batch_no}</td>
+										<td>{rec.medicine_name}</td>
+										<td>{rec.quantity}</td>
+										<td>{rec.unitPrice ? Number(rec.unitPrice).toFixed(2) : "-"}</td>
+										<td>{rec.totalCost ? Number(rec.totalCost).toFixed(2) : "-"}</td>
+										<td>{rec.dose}</td>
+										<td>
+											{canEdit && (
+												<button type="button" className="link" onClick={() => onEditRecord(rec)}>
+													Edit
+												</button>
+											)}
+										</td>
+									</tr>
+								);
+							})}
 						</tbody>
 					</table>
 					<div className="stat-note" style={{ marginTop: "0.75rem", fontSize: "0.95rem" }}>

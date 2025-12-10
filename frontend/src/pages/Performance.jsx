@@ -34,6 +34,8 @@ export default function Performance() {
 	const [closeError, setCloseError] = useState("");
 	const [downloadingPdf, setDownloadingPdf] = useState(false);
 	const [pdfError, setPdfError] = useState("");
+	const [reopening, setReopening] = useState(false);
+	const [reopenError, setReopenError] = useState("");
 
 	const loadReport = async (flockId) => {
 		if (!flockId) return;
@@ -63,6 +65,7 @@ export default function Performance() {
 		setCloseError("");
 		setCloseMessage("");
 		setPdfError("");
+		setReopenError("");
 	}, [selectedFlockId]);
 
 	const selectedFlock = useMemo(() => flocks.find((f) => f._id === selectedFlockId), [flocks, selectedFlockId]);
@@ -152,6 +155,23 @@ export default function Performance() {
 		}
 	};
 
+	const handleReopen = async () => {
+		if (!selectedFlockId || !isClosed) return;
+		setReopenError("");
+		setReopening(true);
+		try {
+			await flockApi.reopen(selectedFlockId);
+			setCloseMessage("Batch reopened. You can now correct entries and close again.");
+			await refreshFlocks();
+			// Reload performance data for this flock with updated status
+			await loadReport(selectedFlockId);
+		} catch (err) {
+			setReopenError(err.response?.data?.error || err.message || "Unable to reopen batch");
+		} finally {
+			setReopening(false);
+		}
+	};
+
 	const handleDownloadPdf = async () => {
 		if (!selectedFlockId || !isClosed) return;
 		setPdfError("");
@@ -238,9 +258,6 @@ export default function Performance() {
 							</div>
 						))}
 					</div>
-					<p className="muted" style={{ marginTop: "0.5rem" }}>
-						G.C fields are intentionally left blank until manual inputs are defined.
-					</p>
 				</div>
 			)}
 
@@ -255,6 +272,16 @@ export default function Performance() {
 						>
 							{isClosed ? "Farm closed" : closing ? "Closing..." : "Farm closing"}
 						</button>
+						{isClosed && (
+							<button
+								type="button"
+								onClick={handleReopen}
+								disabled={reopening || loading}
+								className="ghost"
+							>
+								{reopening ? "Reopening..." : "Reopen batch"}
+							</button>
+						)}
 						<button
 							type="button"
 							onClick={handleDownloadPdf}
@@ -270,6 +297,7 @@ export default function Performance() {
 					)}
 					{closeError && <div className="error mt">{closeError}</div>}
 					{closeMessage && <div className="success mt">{closeMessage}</div>}
+					{reopenError && <div className="error mt">{reopenError}</div>}
 					{pdfError && <div className="error mt">{pdfError}</div>}
 				</div>
 			)}
