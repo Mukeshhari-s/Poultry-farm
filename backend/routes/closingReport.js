@@ -76,7 +76,7 @@ async function buildClosingReport(ownerId, flockId) {
       totalFeedCostIn += cost;
       if (!isDailyUsage) {
         summaryFeedInKg += inKg;
-        summaryFeedInCost += recordCost;
+        summaryFeedInCost += cost;
       }
     }
     if (outKg > 0) {
@@ -86,7 +86,7 @@ async function buildClosingReport(ownerId, flockId) {
       totalFeedCostOut += cost;
       if (!isDailyUsage) {
         summaryFeedOutKg += outKg;
-        summaryFeedOutCost += recordCost;
+        summaryFeedOutCost += cost;
       }
     }
   });
@@ -141,7 +141,8 @@ async function buildClosingReport(ownerId, flockId) {
   const expectedBirdsSold = balanceChicks;
   const shortExcess = totalBirdsSold - expectedBirdsSold;
   const totalFeedIntakeKg = totalFeedIn - totalFeedOut;
-  const cumulativeFeedPerBird = balanceChicks > 0 ? totalFeedIntakeKg / balanceChicks : null;
+  // Cumulative feed per bird uses netFeedKg (feed in - feed out, excluding daily usage)
+  const cumulativeFeedPerBird = balanceChicks > 0 ? netFeedKg / balanceChicks : null;
   const chickCostTotal = totalChickCost;
   // Feed cost based on net feed (same as Feed page net amount)
   const feedCostTotal = netFeedCost;
