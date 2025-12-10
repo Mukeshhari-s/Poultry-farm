@@ -38,7 +38,7 @@ async function getRemainingBirds(batch_no, ownerId) {
 router.post('/', async (req, res) => {
   try {
     const ownerId = req.user._id;
-    const { batch_no, date, vehicle_no = '', cages, birds, remarks, empty_weight, load_weight } = req.body;
+    const { batch_no, date, vehicle_no = '', cages, birds, remarks, empty_weight, load_weight, ageDays } = req.body;
 
     if (!batch_no) return res.status(400).json({ error: 'batch_no is required' });
     if (!date) return res.status(400).json({ error: 'date is required' });
@@ -58,6 +58,21 @@ router.post('/', async (req, res) => {
     // optional: reject sale before batch start_date
     const startDate = strip(batch.start_date);
     if (inputDate < startDate) return res.status(400).json({ error: 'sale date cannot be before batch start_date' });
+
+    // compute default age (days) from dates
+    const dayMs = 1000 * 60 * 60 * 24;
+    const diffMs = inputDate.getTime() - startDate.getTime();
+    const baseDays = diffMs / dayMs;
+    const computedAgeDays = Number.isFinite(baseDays) && baseDays >= 0 ? Math.floor(baseDays) + 1 : 1;
+
+    let finalAgeDays = computedAgeDays;
+    if (ageDays != null) {
+      const ageValue = Number(ageDays);
+      if (!Number.isFinite(ageValue) || ageValue <= 0) {
+        return res.status(400).json({ error: 'ageDays must be greater than 0 when provided' });
+      }
+      finalAgeDays = ageValue;
+    }
 
     // numeric validations
     if (!Number.isFinite(cages) || cages < 0) return res.status(400).json({ error: 'cages must be >= 0' });
@@ -86,6 +101,7 @@ router.post('/', async (req, res) => {
       empty_weight: emptyWeightValue,
       load_weight: loadWeightValue,
       total_weight: computedTotal,
+      ageDays: finalAgeDays,
       remarks
     });
     const saved = await sale.save();
@@ -129,7 +145,7 @@ router.patch('/:id', async (req, res) => {
   try {
     const ownerId = req.user._id;
     const { id } = req.params;
-    const { date, vehicle_no, cages, birds, total_weight, remarks, empty_weight, load_weight } = req.body || {};
+    const { date, vehicle_no, cages, birds, total_weight, remarks, empty_weight, load_weight, ageDays } = req.body || {};
 
     const sale = await Sale.findOne({ _id: id, owner: ownerId });
     if (!sale) return res.status(404).json({ error: 'Sale entry not found' });
@@ -147,6 +163,14 @@ router.patch('/:id', async (req, res) => {
 
     if (vehicle_no !== undefined) sale.vehicle_no = vehicle_no;
     if (remarks !== undefined) sale.remarks = remarks;
+
+    if (ageDays !== undefined) {
+      const ageValue = Number(ageDays);
+      if (!Number.isFinite(ageValue) || ageValue <= 0) {
+        return res.status(400).json({ error: 'ageDays must be greater than 0 when provided' });
+      }
+      sale.ageDays = ageValue;
+    }
 
     if (cages !== undefined) {
       const value = Number(cages);

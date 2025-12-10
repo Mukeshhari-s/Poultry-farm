@@ -10,6 +10,7 @@ const SaleSchema = new mongoose.Schema({
   empty_weight: { type: Number, default: 0 },     // vehicle empty weight in kg
   load_weight: { type: Number, default: 0 },      // vehicle loaded weight in kg
   total_weight: { type: Number, required: true }, // kg (can be fractional)
+  ageDays: { type: Number },                     // optional explicit age in days
   remarks: { type: String }
 }, {
   timestamps: true

@@ -13,6 +13,7 @@ const emptySaleForm = () => ({
 	total_weight: "",
 	empty_weight: "",
 	load_weight: "",
+	ageDays: "",
 });
 
 const computeNetWeight = (load, empty) => {
@@ -21,6 +22,20 @@ const computeNetWeight = (load, empty) => {
 	const diff = loadValue - emptyValue;
 	if (!Number.isFinite(diff) || diff <= 0) return "";
 	return (Math.round(diff * 1000) / 1000).toString();
+};
+
+const computeSaleAgeDays = (startDate, saleDate) => {
+	if (!startDate || !saleDate) return null;
+	const start = new Date(startDate);
+	const sDate = new Date(saleDate);
+	if (Number.isNaN(start.getTime()) || Number.isNaN(sDate.getTime())) return null;
+	start.setHours(0, 0, 0, 0);
+	sDate.setHours(0, 0, 0, 0);
+	const diffMs = sDate.getTime() - start.getTime();
+	const dayMs = 1000 * 60 * 60 * 24;
+	const days = diffMs / dayMs;
+	if (!Number.isFinite(days) || days < 0) return null;
+	return Math.floor(days) + 1; // age should be 1 on chick-in day
 };
 
 export default function Sales() {
@@ -34,9 +49,11 @@ export default function Sales() {
 	const [success, setSuccess] = useState("");
 	const [saving, setSaving] = useState(false);
 	const [form, setForm] = useState(emptySaleForm);
+	const [ageDirty, setAgeDirty] = useState(false);
 	const [editingSale, setEditingSale] = useState(null);
 	const [editForm, setEditForm] = useState(emptySaleForm);
 	const [savingEdit, setSavingEdit] = useState(false);
+	const [editAgeDirty, setEditAgeDirty] = useState(false);
 
 	const selectedFlock = useMemo(
 		() => flocks.find((f) => f.batch_no === selectedBatch),
@@ -104,7 +121,17 @@ export default function Sales() {
 	useEffect(() => {
 		setEditingSale(null);
 		setEditForm(emptySaleForm());
+		setEditAgeDirty(false);
 	}, [selectedBatch]);
+
+	// Auto-compute age for create form when not manually edited
+	useEffect(() => {
+		if (!selectedFlock || ageDirty) return;
+		const age = computeSaleAgeDays(selectedFlock.start_date, form.date);
+		if (age != null) {
+			setForm((prev) => ({ ...prev, ageDays: age.toString() }));
+		}
+	}, [selectedFlock, form.date, ageDirty]);
 
 	const buildFormChangeHandler = (setter) => (e) => {
 		const { name, value } = e.target;
@@ -118,6 +145,12 @@ export default function Sales() {
 	};
 
 	const onChange = buildFormChangeHandler(setForm);
+
+	const onAgeChange = (e) => {
+		const { value } = e.target;
+		setAgeDirty(true);
+		setForm((prev) => ({ ...prev, ageDays: value }));
+	};
 
 	const onSubmit = async (e) => {
 		e.preventDefault();
@@ -133,6 +166,7 @@ export default function Sales() {
 		}
 		const cagesValue = Number(form.cages || 0);
 		const birdsValue = Number(form.birds || 0);
+		const ageDaysValue = Number(form.ageDays || 0);
 		const emptyWeightValue = Number(form.empty_weight || 0);
 		const loadWeightValue = Number(form.load_weight || 0);
 		const netWeightValue = Math.round((loadWeightValue - emptyWeightValue) * 1000) / 1000;
@@ -156,6 +190,10 @@ export default function Sales() {
 			setError("Birds must be greater than zero.");
 			return;
 		}
+		if (!Number.isFinite(ageDaysValue) || ageDaysValue <= 0) {
+			setError("Age (days) must be greater than zero.");
+			return;
+		}
 		setSaving(true);
 		try {
 			await salesApi.create({
@@ -167,9 +205,11 @@ export default function Sales() {
 				empty_weight: emptyWeightValue,
 				load_weight: loadWeightValue,
 				total_weight: netWeightValue,
+				ageDays: ageDaysValue,
 			});
 			setSuccess("Sale recorded.");
 			setForm(emptySaleForm());
+			setAgeDirty(false);
 			fetchSales(selectedBatch);
 		} catch (err) {
 			setError(err.response?.data?.error || err.message || "Unable to save sale");
@@ -179,6 +219,12 @@ export default function Sales() {
 	};
 
 	const onEditChange = buildFormChangeHandler(setEditForm);
+
+	const onEditAgeChange = (e) => {
+		const { value } = e.target;
+		setEditAgeDirty(true);
+		setEditForm((prev) => ({ ...prev, ageDays: value }));
+	};
 
 	const startEdit = (sale) => {
 		if (!isSelectedActive) {
@@ -203,6 +249,11 @@ export default function Sales() {
 		const loadFieldValue = normalizedLoad == null ? "" : normalizedLoad.toString();
 		const netWeightDisplay =
 			computeNetWeight(normalizedLoad, normalizedEmpty) || sale.total_weight?.toString() || "";
+		const existingAge = sale.ageDays;
+		let ageDisplay = existingAge != null ? existingAge : null;
+		if (ageDisplay == null && selectedFlock?.start_date && sale.date) {
+			ageDisplay = computeSaleAgeDays(selectedFlock.start_date, sale.date);
+		}
 		setEditForm({
 			date: formatIndiaDate(sale.date) || today,
 			vehicle_no: sale.vehicle_no || "",
@@ -211,6 +262,7 @@ export default function Sales() {
 			empty_weight: emptyFieldValue,
 			load_weight: loadFieldValue,
 			total_weight: netWeightDisplay,
+			ageDays: ageDisplay != null ? ageDisplay.toString() : "",
 		});
 		setError("");
 		setSuccess("");
@@ -219,6 +271,7 @@ export default function Sales() {
 	const cancelEdit = () => {
 		setEditingSale(null);
 		setEditForm(emptySaleForm());
+		setEditAgeDirty(false);
 	};
 
 	const parseNumber = (value) => Number(value || 0);
@@ -230,6 +283,7 @@ export default function Sales() {
 		setSuccess("");
 		const cagesValue = parseNumber(editForm.cages);
 		const birdsValue = parseNumber(editForm.birds);
+		const ageDaysValue = Number(editForm.ageDays || 0);
 		const emptyWeightValue = Number(editForm.empty_weight || 0);
 		const loadWeightValue = Number(editForm.load_weight || 0);
 		const netWeightValue = Math.round((loadWeightValue - emptyWeightValue) * 1000) / 1000;
@@ -253,6 +307,10 @@ export default function Sales() {
 			setError("Birds must be greater than zero.");
 			return;
 		}
+		if (!Number.isFinite(ageDaysValue) || ageDaysValue <= 0) {
+			setError("Age (days) must be greater than zero.");
+			return;
+		}
 		setSavingEdit(true);
 		try {
 			await salesApi.update(editingSale._id, {
@@ -263,6 +321,7 @@ export default function Sales() {
 				empty_weight: emptyWeightValue,
 				load_weight: loadWeightValue,
 				total_weight: netWeightValue,
+				ageDays: ageDaysValue,
 			});
 			setSuccess("Sale entry updated.");
 			const batchNo = selectedBatch || editingSale.batch_no;
@@ -336,6 +395,16 @@ export default function Sales() {
 						<input type="number" min="0" name="birds" value={form.birds} onChange={onChange} />
 					</label>
 					<label>
+						<span>Age (days)</span>
+						<input
+							type="number"
+							min="1"
+							name="ageDays"
+							value={form.ageDays}
+							onChange={onAgeChange}
+						/>
+					</label>
+					<label>
 						<span>Empty weight (kg)</span>
 						<input
 							type="number"
@@ -398,6 +467,16 @@ export default function Sales() {
 						<label>
 							<span>Birds</span>
 							<input type="number" min="0" name="birds" value={editForm.birds} onChange={onEditChange} />
+						</label>
+						<label>
+							<span>Age (days)</span>
+							<input
+								type="number"
+								min="1"
+								name="ageDays"
+								value={editForm.ageDays}
+								onChange={onEditAgeChange}
+							/>
 						</label>
 						<label>
 							<span>Empty weight (kg)</span>
@@ -473,21 +552,12 @@ export default function Sales() {
 									? Number(sale.total_weight || 0) / Number(sale.birds || 1)
 									: 0;
 								let ageDisplay = "-";
-								if (selectedFlock?.start_date && sale.date) {
-									const start = new Date(selectedFlock.start_date);
-									const saleDate = new Date(sale.date);
-									if (!Number.isNaN(start.getTime()) && !Number.isNaN(saleDate.getTime())) {
-										// Normalize to midnight for whole-day difference
-										start.setHours(0, 0, 0, 0);
-										saleDate.setHours(0, 0, 0, 0);
-										const diffMs = saleDate.getTime() - start.getTime();
-										const dayMs = 1000 * 60 * 60 * 24;
-										const days = diffMs / dayMs;
-										if (Number.isFinite(days) && days >= 0) {
-											// Age should be 1 on chick-in day, so add 1
-											const ageDays = Math.floor(days) + 1;
-											ageDisplay = ageDays.toString();
-										}
+								if (sale.ageDays != null) {
+									ageDisplay = sale.ageDays.toString();
+								} else if (selectedFlock?.start_date && sale.date) {
+									const computed = computeSaleAgeDays(selectedFlock.start_date, sale.date);
+									if (computed != null) {
+										ageDisplay = computed.toString();
 									}
 								}
 								return (
