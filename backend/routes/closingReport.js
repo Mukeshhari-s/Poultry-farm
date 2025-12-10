@@ -365,16 +365,16 @@ router.get('/:flockId/pdf', async (req, res) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
     doc.pipe(res);
-    doc.fontSize(20).text('Batch Performance Report', { align: 'center' });
+    doc.fontSize(24).text('Batch Performance Report', { align: 'center' });
     doc.moveDown();
-    doc.fontSize(14).text(`User: ${userName}`);
-    doc.fontSize(14).text(`Batch: ${batchLabel}`);
+    doc.fontSize(18).text(`User: ${userName}`);
+    doc.fontSize(18).text(`Batch: ${batchLabel}`);
     doc.text(`Start date: ${report.flock.start_date ? new Date(report.flock.start_date).toLocaleDateString() : 'N/A'}`);
     doc.text(`Status: ${report.flock.status || 'active'}`);
     doc.text(`Records captured: ${report.rows?.length || 0}`);
     doc.moveDown();
-    doc.fontSize(16).text('Performance Summary');
-    doc.fontSize(13);
+    doc.fontSize(20).text('Performance Summary');
+    doc.fontSize(17);
     const summaryMetrics = [
       ['Housed chicks', formatNum(perf.housedChicks, 0)],
       ['Feed in kg', formatNum(perf.feedsInKg ?? report.netFeedKg ?? (report.totalFeedIn - report.totalFeedOut), 2)],
@@ -405,8 +405,8 @@ router.get('/:flockId/pdf', async (req, res) => {
       doc.text(`${label}: ${value}`);
     });
     doc.moveDown();
-    doc.fontSize(16).text('Validation');
-    doc.fontSize(12);
+    doc.fontSize(20).text('Validation');
+    doc.fontSize(16);
     doc.text(`Record count: ${validation.recordCount || report.rows?.length || 0}`);
     doc.text(`Minimum days met: ${validation.hasMinRecords ? 'Yes' : 'No'} (need ${validation.minRecordDays || MIN_RECORD_DAYS})`);
     doc.text(
